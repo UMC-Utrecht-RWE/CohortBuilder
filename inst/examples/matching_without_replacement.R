@@ -80,18 +80,14 @@ if (simulate_d3_eligibility) {
 matching_query <- suppressWarnings(
   getSQL(system.file("sql_queries", "matching_query_without_replacement.sql", package = "CohortBuilder"))
 )
-target_table_query <- getSQL(
-  system.file("sql_queries", "create_matching_target_table.sql", package = "CohortBuilder")
-)
 
 ########################################################
 #### Run matching pipeline without replacement mode ####
 ########################################################
 
-D4_MSC <- build_study_cohort(
+build_study_cohort(
   eligible_pop = D3_ELIGIBILITY,
   matching_query = matching_query,
-  target_table_query = target_table_query,
   matching_vars = matching_vars,
   dir_matching_db = dir_matching_db,
   n_cores = NULL,
@@ -99,7 +95,7 @@ D4_MSC <- build_study_cohort(
   output_pars = list(
     save_output = save_output,
     dir_output = dir_outputs,
-    output_file_name = "D4_MSC"
+    output_file_name = "D4_StudyCohort"
   ),
   intermediate_output_pars = list(
     save_intermediate_outputs = save_intermediate_matching_ouputs,

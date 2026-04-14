@@ -48,7 +48,7 @@ dir_bootstrap <- "intermediate_outputs/bootstraps"
 dir_outputs <- "outputs"
 
 # --- Matching options ----------------------------------------------------------
-save_output <- TRUE
+save_output <- FALSE
 save_intermediate_matching_ouputs <- TRUE
 with_bootstrap <- FALSE # set TRUE to run bootstrap resampling
 n_bootstraps <- 5 # number of bootstrap iterations
@@ -92,7 +92,7 @@ The package ships the SQL query templates. Resolve them with `system.file()`:
 
 ```{r sql}
 matching_query <- suppressWarnings(
-    getSQL(system.file("sql_queries", "matching_query_optimised.sql",
+    getSQL(system.file("sql_queries", "matching_query_with_replacement.sql",
         package = "CohortBuilder"
     ))
 )

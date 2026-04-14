@@ -53,7 +53,7 @@ dir_bootstrap <- "intermediate_outputs/bootstraps"
 dir_outputs <- "outputs"
 
 # --- Matching options ----------------------------------------------------------
-save_output <- TRUE
+save_output <- FALSE
 save_intermediate_matching_ouputs <- TRUE
 with_bootstrap <- FALSE
 n_bootstraps <- 1
@@ -101,11 +101,6 @@ matching_query <- suppressWarnings(
         package = "CohortBuilder"
     ))
 )
-target_table_query <- getSQL(
-    system.file("sql_queries", "create_matching_target_table.sql",
-        package = "CohortBuilder"
-    )
-)
 ```
 
 ## Step 4 — Run the pipeline
@@ -114,7 +109,6 @@ target_table_query <- getSQL(
 D4_MSC <- build_study_cohort(
     eligible_pop = D3_ELIGIBILITY,
     matching_query = matching_query,
-    target_table_query = target_table_query,
     matching_vars = matching_vars,
     dir_matching_db = dir_matching_db,
     n_cores = NULL, # auto-detects all cores minus one
