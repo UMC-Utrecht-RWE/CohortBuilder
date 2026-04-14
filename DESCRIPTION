@@ -2,14 +2,13 @@ Package: CohortBuilder
 Title: Bootstrap SQL-Based Matched Study Cohort Builder
 Version: 0.1.0
 Authors@R:
+    c(
     person("Sebastian", "Mildiner Moraga",
            email = "s.mildinermoraga@umcutrecht.nl",
            role = c("aut", "cre"),
-           user_id = "smildiner",
            comment = c(ORCID = "")),
-    person("Wijnand", "Laan",
-    role = "aut",
-    user_id = "Wijnand-UMC")
+    person("Wijnand", "Laan", role = "aut")
+    )
 Description: Constructs matched study cohorts by matching eligible exposed
     individuals to eligible controls based on predefined profile variables and
     time windows. Matching is executed in DuckDB using SQL and optionally
