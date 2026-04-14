@@ -1,0 +1,192 @@
+---
+title: "Matching With Replacement (Optional Bootstrap)"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Matching With Replacement (Optional Bootstrap)}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+    collapse = TRUE,
+    comment = "#>",
+    eval = FALSE
+)
+```
+
+## Overview
+
+This vignette demonstrates how to run the CohortBuilder matching pipeline in
+**with-replacement** mode, where each eligible exposed spell is matched to a
+control spell by minimising a random-number difference via SQL inside DuckDB.
+Optionally, the match can be repeated across `n_bootstraps` bootstrap resamples
+to quantify variability.
+
+## Prerequisites
+
+```{r setup}
+library(CohortBuilder)
+library(data.table)
+```
+
+## Step 1 — Configure parameters
+
+```{r parameters}
+# Variables to match on (must be present in the eligibility data)
+matching_vars <- c(
+    "SV_SEX", "SV_REGION", "SV_HIST_COVID_VACC", "SV_PRIOR_COVID_DG",
+    "SV_BRAND_COVID_VACC", "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED",
+    "CDC_RISK", "SV_SES_STATUS"
+)
+
+# --- Directories --------------------------------------------------------------
+dir_input <- "input"
+dir_int_outputs <- "intermediate_outputs"
+dir_matching_db <- "intermediate_outputs/matching.duckdb"
+dir_bootstrap <- "intermediate_outputs/bootstraps"
+dir_outputs <- "outputs"
+
+# --- Matching options ----------------------------------------------------------
+save_output <- TRUE
+save_intermediate_matching_ouputs <- TRUE
+with_bootstrap <- FALSE # set TRUE to run bootstrap resampling
+n_bootstraps <- 5 # number of bootstrap iterations
+start_seed <- 42
+```
+
+## Step 2 — Prepare input data
+
+Provide your own eligibility dataset as a `data.frame` or `data.table` saved in
+`input/D3_ELIGIBILITY.parquet`, or generate synthetic data for testing:
+
+```{r input}
+# Option A: generate synthetic data
+D3_ELIGIBILITY <- generate_eligibility_data(
+    n = 100000,
+    start_seed = start_seed,
+    save_output = FALSE,
+    output_dir = dir_input,
+    output_file = "D3_ELIGIBILITY"
+)
+
+# Option B: read your own data
+# D3_ELIGIBILITY <- arrow::read_parquet(file.path(dir_input, "D3_ELIGIBILITY.parquet"))
+```
+
+The minimum required columns are:
+
+| Column | Description |
+|---|---|
+| `person_id` | Unique person or spell identifier |
+| Matching variables | As listed in `matching_vars` |
+| `eligible_exposed` | Logical — TRUE if the row is an exposed spell |
+| `eligible_control` | Logical — TRUE if the row is an eligible control |
+| `matching_status_start` | Date: start of the matching window |
+| `matching_status_end` | Date: end of the matching window |
+| `year_of_birth` | Integer year of birth (used for ± 1-year age matching) |
+
+## Step 3 — Load SQL templates
+
+The package ships the SQL query templates. Resolve them with `system.file()`:
+
+```{r sql}
+matching_query <- suppressWarnings(
+    getSQL(system.file("sql_queries", "matching_query_optimised.sql",
+        package = "CohortBuilder"
+    ))
+)
+target_table_query <- getSQL(
+    system.file("sql_queries", "create_matching_target_table.sql",
+        package = "CohortBuilder"
+    )
+)
+```
+
+## Step 4 — Run the pipeline
+
+```{r run}
+D4_MSC <- build_study_cohort(
+    eligible_pop = D3_ELIGIBILITY,
+    matching_query = matching_query,
+    target_table_query = target_table_query,
+    matching_vars = matching_vars,
+    dir_matching_db = dir_matching_db,
+    n_cores = NULL, # auto-detects all cores minus one
+    log_name = "log_build_study_cohort",
+    output_pars = list(
+        save_output      = save_output,
+        dir_output       = dir_outputs,
+        output_file_name = "D4_MSC"
+    ),
+    intermediate_output_pars = list(
+        save_intermediate_outputs = save_intermediate_matching_ouputs,
+        dir_intermediate_outputs  = dir_int_outputs,
+        profile_table_name        = "D3_LOOKUP_TABLE",
+        matching_pop_name         = "D3_MATCHING_POP"
+    ),
+    bootstrap_pars = list(
+        with_bootstrap = with_bootstrap,
+        n_bootstraps   = n_bootstraps,
+        dir_bootstrap  = dir_bootstrap,
+        start_seed     = start_seed
+    ),
+    input_column_names = list(
+        col_person_id = "person_id",
+        col_eligible_exposed = "eligible_exposed",
+        col_eligible_control = "eligible_control",
+        col_matching_status_start = "matching_status_start",
+        col_matching_status_end = "matching_status_end",
+        col_age_iterator = "year_of_birth"
+    ),
+    output_column_names = list(
+        col_person_id       = "person_id",
+        col_match_id        = "match_id",
+        col_treatment_group = "group",
+        col_T0              = "T0"
+    ),
+    matching_mode = "with_replacement"
+)
+```
+
+## Step 5 — Inspect results
+
+When `save_output = FALSE` (or when returned), `D4_MSC` is a `data.table` with
+one row per person-spell in the matched cohort:
+
+```{r inspect}
+# Group counts
+D4_MSC[, .N, by = group]
+
+# Number of matched pairs
+D4_MSC[!is.na(match_id), data.table::uniqueN(match_id)]
+```
+
+| Column | Description |
+|---|---|
+| `person_id` | Person/spell identifier |
+| `match_id` | Shared identifier for each matched pair |
+| `boot_id` | Bootstrap iteration (always 1 when `with_bootstrap = FALSE`) |
+| `group` | `"EXPOSED"`, `"CONTROL"`, or `"UNMATCHED"` |
+| `T0` | Index date (start of the exposed spell) |
+| `matching_status_start` | Start of the eligibility window |
+| `matching_status_end` | End of the eligibility window |
+| Matching variables | Copied from the lookup table |
+
+## Bootstrap mode
+
+Set `with_bootstrap = TRUE` and `n_bootstraps` to a positive integer. Each
+bootstrap resample is written to `dir_bootstrap/D4_MSC_bootstrap_<i>.parquet`
+rather than returned in memory.
+
+```{r bootstrap, eval = FALSE}
+build_study_cohort(
+    # ... same arguments as above ...
+    bootstrap_pars = list(
+        with_bootstrap = TRUE,
+        n_bootstraps   = 500,
+        dir_bootstrap  = dir_bootstrap,
+        start_seed     = 42
+    )
+)
+```

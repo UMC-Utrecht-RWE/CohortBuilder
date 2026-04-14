@@ -1,0 +1,10 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^input$
+^intermediate_outputs$
+^outputs$
+^log$
+^database$
+^profiling$
+^\.DS_Store$
+^LICENSE\.md$

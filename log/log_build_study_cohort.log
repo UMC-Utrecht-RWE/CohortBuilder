@@ -1,0 +1,137 @@
+========================================================================= 
+Log Path: ./log/log_build_study_cohort.log 
+Program Path: /Users/smildine/Documents/GitHub/CohortBuilder/inst/examples/matching_with_replacement.R 
+Working Directory: /Users/smildine/Documents/GitHub/CohortBuilder 
+User Name: smildine 
+R Version: 4.4.2 (2024-10-31) 
+Machine: MA016119 arm64 
+Operating System: Darwin 25.3.0 Darwin Kernel Version 25.3.0: Wed Jan 28 20:56:34 PST 2026; root:xnu-12377.91.3~2/RELEASE_ARM64_T8122 
+Base Packages: stats graphics grDevices utils datasets methods base 
+Other Packages: data.table_1.18.2.1 CohortBuilder_0.1.0 
+Log Start Time: 2026-04-14 12:00:22.236626 
+========================================================================= 
+
+[MATCHING] - Setting up matching environment 
+
+NOTE: Log Print Time:  2026-04-14 12:00:22.237082 
+NOTE: Elapsed Time: 0.000220060348510742 secs 
+
+[MATCHING] - Setting up matching environment 
+
+NOTE: Log Print Time:  2026-04-14 12:00:22.23731 
+NOTE: Elapsed Time: 0.000227928161621094 secs 
+
+[MATCHING] - Matching environment set up successfully 
+
+NOTE: Log Print Time:  2026-04-14 12:00:22.237526 
+NOTE: Elapsed Time: 0.000216007232666016 secs 
+
+[MATCHING] - Retrieving matching variables 
+
+NOTE: Log Print Time:  2026-04-14 12:00:22.237725 
+NOTE: Elapsed Time: 0.000199079513549805 secs 
+
+The following variables will be used for matching: SV_SEX, SV_REGION, SV_HIST_COVID_VACC, SV_PRIOR_COVID_DG, SV_BRAND_COVID_VACC, SV_PREG_STATUS, SV_IMMUNOCOMPROMISED, CDC_RISK, SV_SES_STATUS 
+
+NOTE: Log Print Time:  2026-04-14 12:00:22.238014 
+NOTE: Elapsed Time: 0.000288963317871094 secs 
+
+[MATCHING] - Matching variables retrieved successfully 
+
+NOTE: Log Print Time:  2026-04-14 12:00:22.238205 
+NOTE: Elapsed Time: 0.000190973281860352 secs 
+
+[MATCHING] - Creating lookup table 
+
+NOTE: Log Print Time:  2026-04-14 12:00:22.417593 
+NOTE: Elapsed Time: 0.179388046264648 secs 
+
+[MATCHING] - Lookup table created successfully 
+
+NOTE: Log Print Time:  2026-04-14 12:00:22.444286 
+NOTE: Elapsed Time: 0.0266931056976318 secs 
+
+[MATCHING] - Saving lookup table to intermediate_outputs/D3_LOOKUP_TABLE.parquet 
+
+NOTE: Log Print Time:  2026-04-14 12:00:22.44469 
+NOTE: Elapsed Time: 0.000403881072998047 secs 
+
+[MATCHING] - Lookup table saved successfully 
+
+NOTE: Log Print Time:  2026-04-14 12:00:22.448715 
+NOTE: Elapsed Time: 0.00402498245239258 secs 
+
+[MATCHING] - Creating D3_MATCHING_POP 
+
+NOTE: Log Print Time:  2026-04-14 12:00:22.448984 
+NOTE: Elapsed Time: 0.000268936157226562 secs 
+
+[MATCHING] - D3_MATCHING_POP created successfully 
+
+NOTE: Log Print Time:  2026-04-14 12:00:22.500121 
+NOTE: Elapsed Time: 0.0511372089385986 secs 
+
+[MATCHING] - Saving D3_MATCHING_POP to intermediate_outputs/D3_MATCHING_POP.parquet 
+
+NOTE: Log Print Time:  2026-04-14 12:00:22.500416 
+NOTE: Elapsed Time: 0.000294923782348633 secs 
+
+[MATCHING] - D3_MATCHING_POP saved successfully 
+
+NOTE: Log Print Time:  2026-04-14 12:00:22.513773 
+NOTE: Elapsed Time: 0.0133569240570068 secs 
+
+The parameter `n_cores` was not specified. By default 7 will be used in the SQL matching procedure. 
+
+NOTE: Log Print Time:  2026-04-14 12:00:22.566305 
+NOTE: Elapsed Time: 0.0525319576263428 secs 
+
+The parameter `n_bootstraps` was overruled to 1 since no bootstrap will be done (`with_bootstrap` = FALSE) 
+
+NOTE: Log Print Time:  2026-04-14 12:00:22.567869 
+NOTE: Elapsed Time: 0.00156402587890625 secs 
+
+Doing iteration 1 of 1.... 
+
+NOTE: Log Print Time:  2026-04-14 12:00:22.570917 
+NOTE: Elapsed Time: 0.00304794311523438 secs 
+
+[MATCHING] - END 
+
+NOTE: Log Print Time:  2026-04-14 12:00:23.28543 
+NOTE: Elapsed Time: 0.714513063430786 secs 
+
+[MATCHING] - Reading matching dataset back into R 
+
+NOTE: Log Print Time:  2026-04-14 12:00:23.285666 
+NOTE: Elapsed Time: 0.000236034393310547 secs 
+
+[MATCHING] - Done reading matching dataset back into R 
+
+NOTE: Log Print Time:  2026-04-14 12:00:23.295878 
+NOTE: Elapsed Time: 0.0102119445800781 secs 
+
+[MATCHING] - Saving outputs/D4_MSC.parquet to disk... 
+
+NOTE: Log Print Time:  2026-04-14 12:00:23.296162 
+NOTE: Elapsed Time: 0.000283956527709961 secs 
+
+[MATCHING] - outputs/D4_MSC.parquet saved to disk successfully. 
+
+NOTE: Log Print Time:  2026-04-14 12:00:23.310375 
+NOTE: Elapsed Time: 0.0142130851745605 secs 
+
+[MATCHING] - Disconnected from the database (intermediate_outputs/matching.duckdb). 
+
+NOTE: Log Print Time:  2026-04-14 12:00:23.3828 
+NOTE: Elapsed Time: 0.072425127029419 secs 
+
+[MATCHING] - Removed existing database. 
+
+NOTE: Log Print Time:  2026-04-14 12:00:23.38321 
+NOTE: Elapsed Time: 0.000409841537475586 secs 
+
+========================================================================= 
+Log End Time: 2026-04-14 12:00:23.383314 
+Log Elapsed Time: 0 00:00:01 
+========================================================================= 
