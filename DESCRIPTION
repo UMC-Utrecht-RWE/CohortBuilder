@@ -5,7 +5,11 @@ Authors@R:
     person("Sebastian", "Mildiner Moraga",
            email = "s.mildinermoraga@umcutrecht.nl",
            role = c("aut", "cre"),
+           user_id = "smildiner",
            comment = c(ORCID = ""))
+    person("Wijnand", "Laan",
+    role = "ctr",
+    user_id = "Wijnand-UMC")
 Description: Constructs matched study cohorts by matching eligible exposed
     individuals to eligible controls based on predefined profile variables and
     time windows. Matching is executed in DuckDB using SQL and optionally
