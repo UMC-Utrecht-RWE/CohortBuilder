@@ -15,4 +15,9 @@ Constructs matched study cohorts by matching eligible exposed individuals to eli
 \author{
 \strong{Maintainer}: Sebastian Mildiner Moraga \email{s.mildinermoraga@umcutrecht.nl}
 
+Authors:
+\itemize{
+  \item Wijnand Laan
+}
+
 }
