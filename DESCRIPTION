@@ -6,9 +6,9 @@ Authors@R:
            email = "s.mildinermoraga@umcutrecht.nl",
            role = c("aut", "cre"),
            user_id = "smildiner",
-           comment = c(ORCID = ""))
+           comment = c(ORCID = "")),
     person("Wijnand", "Laan",
-    role = "ctr",
+    role = "aut",
     user_id = "Wijnand-UMC")
 Description: Constructs matched study cohorts by matching eligible exposed
     individuals to eligible controls based on predefined profile variables and
