@@ -119,8 +119,8 @@ build_study_cohort(
     col_person_id = "person_id",
     col_eligible_exposed = "eligible_exposed",
     col_eligible_control = "eligible_control",
-    col_matching_status_start = "matching_status_start",
-    col_matching_status_end = "matching_status_end",
+    col_matching_status_start = "start",
+    col_matching_status_end = "end",
     col_age_iterator = "year_of_birth"
   ),
   output_column_names = list(

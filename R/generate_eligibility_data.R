@@ -24,7 +24,7 @@
 #' - **COMP_COMORBIDITIES**: Presence of comorbidities.
 #' - **receives_any_covidvaccine**: Indicates if any COVID vaccine was received.
 #' - **receives_bivalent**: Indicates if a bivalent vaccine was received.
-#' - **matching_status_start**: Start date of matching eligibility.
+#' - **start**: Start date of matching eligibility.
 #' - Additional derived variables like age, eligibility, and exposure status.
 #'
 #' If `save_output` is TRUE, the generated dataset is saved in `.parquet` format in the `output_dir`.
@@ -70,7 +70,7 @@ generate_eligibility_data <- function(n = 10000, start_seed = 42, save_output, o
     elevenmonth_since_lastvac = sample(c(TRUE, FALSE), n, replace = TRUE, prob = c(0.5, 0.5)),
     prior_bivalent = sample(c(TRUE, FALSE), n, replace = TRUE, prob = c(0.2, 0.8)),
     receives_first_bivalent = FALSE,
-    matching_status_start = sample(seq(as.Date("2020-01-01"), as.Date("2022-12-31"), by = "day"), n, replace = TRUE)
+    start = sample(seq(as.Date("2020-01-01"), as.Date("2022-12-31"), by = "day"), n, replace = TRUE)
   )
 
   # Fill conditional columns
@@ -97,8 +97,8 @@ generate_eligibility_data <- function(n = 10000, start_seed = 42, save_output, o
 
   # Mutate threshold-related columns first
   D3_ELIGIBILITY[, `:=`(
-    threshold_ba1_met = (as.numeric(format(matching_status_start, "%Y")) - year_of_birth) >= 12,
-    threshold_ba45_met = (as.numeric(format(matching_status_start, "%Y")) - year_of_birth) >= 5
+    threshold_ba1_met = (as.numeric(format(start, "%Y")) - year_of_birth) >= 12,
+    threshold_ba45_met = (as.numeric(format(start, "%Y")) - year_of_birth) >= 5
   )]
 
   # Mutate other related columns in sequence to avoid dependencies
@@ -126,8 +126,8 @@ generate_eligibility_data <- function(n = 10000, start_seed = 42, save_output, o
 
   # Add all additional columns (complete information, end date, older_than_sixty, etc.)
   D3_ELIGIBILITY[, `:=`(
-    matching_status_end = as.Date(ifelse(receives_first_bivalent == TRUE, matching_status_start, matching_status_start + as.difftime(60, units = "days"))),
-    older_than_sixty = (as.numeric(format(matching_status_start, "%Y")) - year_of_birth) > 60,
+    end = as.Date(ifelse(receives_first_bivalent == TRUE, start, start + as.difftime(60, units = "days"))),
+    older_than_sixty = (as.numeric(format(start, "%Y")) - year_of_birth) > 60,
     bivalent_type_received = ifelse(
       receives_bivalent,
       sample(c("ba1", "ba45", "unknown", NA), n, replace = TRUE, prob = c(0.3, 0.3, 0.3, 0.1)),

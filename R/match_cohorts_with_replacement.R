@@ -132,8 +132,8 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
 
     # Convert all matching variables to integer format for efficient SQL processing
     sampled_df[, person_id_int := as.integer(factor(person_id))]
-    sampled_df[, startdateINT := as.integer(as.Date(matching_status_start) - as.Date("1970-01-01"))]
-    sampled_df[, enddateINT := as.integer(as.Date(matching_status_end) - as.Date("1970-01-01"))]
+    sampled_df[, startdateINT := as.integer(as.Date(get(col_matching_status_start)) - as.Date("1970-01-01"))]
+    sampled_df[, enddateINT := as.integer(as.Date(get(col_matching_status_end)) - as.Date("1970-01-01"))]
     sampled_df[, year_of_birth := as.integer(get(col_age_iterator))]
     sampled_df[, groupkey := as.integer(groupkey)]
 
@@ -146,7 +146,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     sampled_df_Exp <- sampled_df[
       group == "exposed",
       .(
-        person_id, person_id_int, groupkey, group, matching_status_start, matching_status_end,
+        person_id, person_id_int, groupkey, group, get(col_matching_status_start), get(col_matching_status_end),
         year_of_birth, startdateINT, enddateINT
       )
     ]
@@ -158,7 +158,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     sampled_df_Un <- sampled_df[
       group == "control",
       .(
-        person_id, groupkey, group, matching_status_start, matching_status_end,
+        person_id, groupkey, group, get(col_matching_status_start), get(col_matching_status_end),
         year_of_birth, startdateINT, enddateINT
       )
     ]

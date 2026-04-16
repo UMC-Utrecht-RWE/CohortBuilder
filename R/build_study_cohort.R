@@ -162,7 +162,10 @@ build_study_cohort <- function(eligible_pop = NULL,
   ###########################
 
   if (all(eligible_pop[[input_column_names$col_eligible_exposed]] == FALSE)) {
-    matched_population_colnames <- c("person_id", "match_id", "T0", "group", "matching_status_start", "matching_status_end", "year_of_birth")
+    matched_population_colnames <- c(
+      output_column_names$col_person_id,
+      output_column_names$col_match_id, output_column_names$col_T0, output_column_names$col_treatment_group, input_column_names$col_matching_status_start, input_column_names$col_matching_status_end, input_column_names$col_age_iterator
+    )
     matched_population <- data.table::setDT(setNames(
       data.frame(matrix(ncol = length(c(matched_population_colnames, matching_vars)), nrow = 0)),
       c(matched_population_colnames, matching_vars)

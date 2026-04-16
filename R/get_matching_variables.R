@@ -50,5 +50,3 @@ get_matching_variables <- function(eligible_pop, matching_vars = c(
 
   return(matching_vars)
 }
-
-
