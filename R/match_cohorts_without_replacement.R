@@ -113,19 +113,24 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
                                               col_matching_status_start = "matching_status_start",
                                               col_matching_status_end = "matching_status_end",
                                               col_age_iterator = "year_of_birth") {
+  # Validate required parameters
   if (is.null(matching_query)) {
     stop("`matching_query` must be provided for `match_cohorts_without_replacement`.")
   }
 
+  # Configure number of CPU threads for DuckDB
   if (is.null(n_cores)) {
     n_cores <- parallel::detectCores() - 1
     logr::log_print(paste0("The parameter `n_cores` was not specified. By default ", n_cores, " will be used in the SQL matching procedure."))
   }
 
+  # Set DuckDB thread configuration
   DBI::dbExecute(matching_conn, paste0("PRAGMA threads=", n_cores, ";"))
 
+  # Begin pool preparation for greedy matching
   logr::log_print("[MATCHING-NR] - Preparing no-replacement matching pool")
 
+  # Transform matching population to internal format with integer date encoding
   pool_dt <- data.table::as.data.table(matching_pop_groupkey)[
     , .(
       person_id = as.character(get(col_person_id)),
@@ -137,12 +142,16 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
     )
   ]
 
+  # Remove records with missing critical matching fields and assign spell identifiers
   pool_dt <- pool_dt[!is.na(person_id) & !is.na(groupkey) & !is.na(startdateINT) & !is.na(enddateINT)]
   pool_dt[, spell_id := .I]
+  # Extract and store all exposed spells for later identification of unmatched records
   exposed_pool_all <- pool_dt[group == "exposed"]
 
+  # Handle edge case: no exposed spells available for matching
   if (nrow(pool_dt[group == "exposed"]) == 0L) {
     logr::log_print("[MATCHING-NR] - No exposed spells in matching population")
+    # Create empty output with correct structure but no rows
     empty <- data.table::as.data.table(profile_table)[0]
     empty[, (col_person_id) := character()]
     empty[, (col_match_id) := integer()]
@@ -156,6 +165,7 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
       col_T0, col_matching_status_start, col_matching_status_end, matching_vars
     )
     out <- empty[, ..out_cols]
+    # Optionally save empty result to disk
     if (isTRUE(save_output)) {
       output_file_path <- file.path(result_dir, paste0(result_file, ".parquet"))
       arrow::write_parquet(out, output_file_path)
@@ -163,63 +173,82 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
     return(out)
   }
 
+  # Load matching pool into DuckDB temporary tables for SQL-based candidate generation
   DBI::dbWriteTable(matching_conn, "pool_nr", as.data.frame(pool_dt), overwrite = TRUE, temporary = TRUE)
+  # Initialize person availability state table (marks people as available for matching)
   DBI::dbExecute(matching_conn, "
     CREATE OR REPLACE TEMP TABLE person_state_nr AS
     SELECT DISTINCT person_id, TRUE AS available
     FROM pool_nr
   ")
 
+  # Initialize greedy matching state and tracking variables
   all_matches <- list()
   next_match_id <- 1L
   round_id <- 1L
 
+  # Replace seed placeholder in matching query for deterministic reproducibility
   matching_query_adjusted <- gsub("__START_SEED__", as.character(as.integer(start_seed)), matching_query, fixed = TRUE)
 
+  # Begin greedy matching rounds: continue until no more pairs can be formed
   repeat {
+    # Generate candidate exposed-control pairs for current pool of available people
     logr::log_print(paste0("[MATCHING-NR] - Round ", round_id, ": computing greedy proposals"))
 
     accepted_round <- DBI::dbGetQuery(matching_conn, matching_query_adjusted)
     accepted_round <- data.table::as.data.table(accepted_round)
 
+    # Exit matching loop when no more candidate pairs are available
     if (nrow(accepted_round) == 0L) {
       logr::log_print(paste0("[MATCHING-NR] - Round ", round_id, ": no further pairs found"))
       break
     }
 
+    # Sort candidates by exposed spell priority and start date for deterministic ordering
     data.table::setorder(accepted_round, exposed_priority, exp_startdateINT, exp_spell_id)
+    # Extract person identifiers and build reverse lookup for collision detection
     exp_ids <- accepted_round$exp_person_id
     ctrl_ids <- accepted_round$ctrl_person_id
     person_levels <- unique(c(exp_ids, ctrl_ids))
     exp_idx <- data.table::chmatch(exp_ids, person_levels)
     ctrl_idx <- data.table::chmatch(ctrl_ids, person_levels)
+    # Track which people have already been assigned in this round
     used_people <- rep(FALSE, length(person_levels))
     keep_idx <- logical(nrow(accepted_round))
 
+    # Resolve collisions: ensure each person appears at most once per round
     for (i in seq_len(nrow(accepted_round))) {
+      cat(sprintf("\rChecking matched pairs for duplicates, %d%% ready...", round((i / nrow(accepted_round)) * 100)))
+
       exp_i <- exp_idx[[i]]
       ctrl_i <- ctrl_idx[[i]]
+      # Keep pair only if both exposed and control are still available in this round
       if (!used_people[[exp_i]] && !used_people[[ctrl_i]]) {
         keep_idx[[i]] <- TRUE
         used_people[[exp_i]] <- TRUE
         used_people[[ctrl_i]] <- TRUE
       }
     }
+    # Filter to non-colliding pairs only
     accepted_round <- accepted_round[keep_idx]
 
+    # Exit if all candidate pairs dissolved due to collisions
     if (nrow(accepted_round) == 0L) {
       logr::log_print(paste0("[MATCHING-NR] - Round ", round_id, ": proposals dissolved by person-level tie-breaking"))
       break
     }
 
+    # Assign unique match identifiers to accepted pairs and store results
     accepted_round[, match_id := seq.int(next_match_id, next_match_id + .N - 1L)]
     next_match_id <- next_match_id + nrow(accepted_round)
     all_matches[[length(all_matches) + 1L]] <- accepted_round
 
+    # Extract all matched people (both exposed and control) from this round
     matched_persons <- data.table::data.table(
       person_id = unique(c(accepted_round$exp_person_id, accepted_round$ctrl_person_id))
     )
 
+    # Update person availability state: mark matched people as unavailable for future rounds
     DBI::dbWriteTable(matching_conn, "matched_persons_nr", as.data.frame(matched_persons), overwrite = TRUE, temporary = TRUE)
     DBI::dbExecute(matching_conn, "
       UPDATE person_state_nr
@@ -227,9 +256,11 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
       WHERE person_id IN (SELECT person_id FROM matched_persons_nr)
     ")
 
+    # Increment round counter and continue to next iteration
     round_id <- round_id + 1L
   }
 
+  # Combine all matched pairs from all rounds, or create empty structure if no matches
   matched_pairs <- if (length(all_matches) > 0L) {
     data.table::rbindlist(all_matches, use.names = TRUE)
   } else {
@@ -241,9 +272,11 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
     )
   }
 
+  # Convert integer date encoding back to calendar dates for output
   origin_date <- as.Date("1970-01-01")
   profile_dt <- data.table::as.data.table(profile_table)
 
+  # Extract matched exposed spells with dates decoded and group labeled as "EXPOSED"
   exposed_matched <- matched_pairs[
     , .(
       person_id = exp_person_id,
@@ -257,6 +290,7 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
     )
   ]
 
+  # Extract matched control spells with dates decoded and group labeled as "CONTROL"
   control_matched <- matched_pairs[
     , .(
       person_id = ctrl_person_id,
@@ -270,7 +304,9 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
     )
   ]
 
+  # Identify all exposed spells that were never successfully matched
   matched_exposed_spell_ids <- unique(matched_pairs$exp_spell_id)
+  # Format unmatched exposed records with NA match_id and "UNMATCHED" group label
   exposed_unmatched <- exposed_pool_all[
     !spell_id %in% matched_exposed_spell_ids,
     .(
@@ -285,17 +321,20 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
     )
   ]
 
+  # Combine all matched and unmatched records into one output table
   match_results_long <- data.table::rbindlist(
     list(exposed_matched, control_matched, exposed_unmatched),
     use.names = TRUE,
     fill = TRUE
   )
 
+  # Left join profile data (matching variables) back to results by groupkey
   match_results_long <- profile_dt[
     match_results_long,
     on = "groupkey"
   ]
 
+  # Rename internal column names to user-specified output column names
   data.table::setnames(match_results_long,
     old = c(
       "person_id", "match_id", "group", "T0",
@@ -308,6 +347,7 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
     skip_absent = TRUE
   )
 
+  # Select and order final output columns in desired sequence
   out_cols <- c(
     col_person_id, col_match_id, "boot_id", col_treatment_group,
     col_T0, col_matching_status_start, col_matching_status_end, matching_vars
@@ -315,6 +355,7 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
   out_cols <- out_cols[out_cols %in% colnames(match_results_long)]
   match_results_long <- match_results_long[, ..out_cols]
 
+  # Optionally save results to parquet file on disk
   if (isTRUE(save_output)) {
     output_file_path <- file.path(result_dir, paste0(result_file, ".parquet"))
     logr::log_print(paste0("[MATCHING-NR] - Saving ", output_file_path, " to disk..."))
@@ -322,11 +363,11 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
     logr::log_print(paste0("[MATCHING-NR] - ", output_file_path, " saved to disk successfully."))
   }
 
+  # Log completion of matching procedure
   logr::log_print("[MATCHING-NR] - END")
 
+  # Return results to environment if not saving to disk
   if (!isTRUE(save_output)) {
     return(match_results_long)
   }
 }
-
-

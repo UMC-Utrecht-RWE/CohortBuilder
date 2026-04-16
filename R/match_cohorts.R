@@ -67,49 +67,44 @@ match_cohorts <- function(matching_pop_groupkey = NULL,
                           col_matching_status_start = "matching_status_start",
                           col_matching_status_end = "matching_status_end",
                           col_age_iterator = "year_of_birth") {
-  #########################################
-  ##### Connect to the DuckDB-database ####
-  #########################################
-
-  # Check number of cores
+  # Configure DuckDB connection and thread count for SQL execution
   if (is.null(n_cores)) {
     n_cores <- parallel::detectCores() - 1
     logr::log_print(paste0("The parameter `n_cores` was not specified. By default ", n_cores, " will be used in the SQL matching procedure."))
   }
 
+  # Set DuckDB thread configuration
   DBI::dbExecute(matching_conn, paste0("PRAGMA threads=", n_cores, ";"))
 
-  # Create our matching target table
+  # Initialize matching target table for storing results
   DBI::dbExecute(matching_conn, target_table_query)
 
-  ##################################################
-  ##### Overrule number of bootstrap iterations ####
-  ##################################################
-
+  # Override bootstrap iterations when bootstrapping is disabled
   if (!with_bootstrap) {
     if (is.null(n_bootstraps)) {
       n_bootstraps <- 1
     }
 
+    # Force single iteration if bootstrap is disabled
     if (n_bootstraps != 1) {
       logr::log_print(paste0("The parameter `n_bootstraps` was overruled to 1 since no bootstrap will be done (`with_bootstrap` = FALSE)"))
     }
     n_bootstraps <- 1
   }
 
-  #######################################
-  #### Let's start the bootstrapping ####
-  #######################################
-
+  # Begin main bootstrap loop: iterate matching process with optional resampling
   for (bootstrap in 1:n_bootstraps) {
     tictoc::tic()
 
+    # Log current bootstrap iteration progress
     logr::log_print(paste0("Doing iteration ", bootstrap, " of ", n_bootstraps, ".... \n"))
 
+    # Conditional resampling with replacement if bootstrapping is enabled
     if (with_bootstrap) {
       set.seed(start_seed + bootstrap)
 
       cat(sprintf("\r%-50s", "Sampling...."))
+      # Sample unique person IDs with replacement for bootstrap iteration
       sampled_ids <- matching_pop_groupkey[
         , .(person_id = unique(get(col_person_id)))
       ][
@@ -118,31 +113,35 @@ match_cohorts <- function(matching_pop_groupkey = NULL,
         order(person_id)
       ]
 
-      # Prepare the join expression dynamically
+      # Build dynamic join condition using specified person_id column name
       join_condition <- setNames("person_id", col_person_id)
 
       cat(sprintf("\r%-50s", "Sampling back to the source population...."))
+      # Join resampled person IDs back to get all their records
       sampled_df <- matching_pop_groupkey[sampled_ids, on = join_condition]
 
       rm(sampled_ids, join_condition)
       gc()
     } else {
+      # No bootstrap: use original population as-is for single iteration
       cat(sprintf("\r%-50s", "No resampling; the source population will be used...."))
       sampled_df <- matching_pop_groupkey
 
       gc()
     }
 
-    # Convert variables to int using data.table
+    # Convert all matching variables to integer format for efficient SQL processing
     sampled_df[, person_id_int := as.integer(factor(person_id))]
     sampled_df[, startdateINT := as.integer(as.Date(matching_status_start) - as.Date("1970-01-01"))]
     sampled_df[, enddateINT := as.integer(as.Date(matching_status_end) - as.Date("1970-01-01"))]
     sampled_df[, year_of_birth := as.integer(get(col_age_iterator))]
     sampled_df[, groupkey := as.integer(groupkey)]
 
+    # Determine year-of-birth range for year-wise matching iterations
     min_year <- min(sampled_df$year_of_birth, na.rm = TRUE)
     max_year <- max(sampled_df$year_of_birth, na.rm = TRUE)
 
+    # Extract exposed population and assign random values for stochastic matching
     cat(sprintf("\r%-50s", "Selecting the exposed population...."))
     sampled_df_Exp <- sampled_df[
       group == "exposed",
@@ -154,6 +153,7 @@ match_cohorts <- function(matching_pop_groupkey = NULL,
     sampled_df_Exp[, random := runif(.N, min = 0, max = 10)]
     sampled_df_Exp[, match_id := .I]
 
+    # Extract control population and assign random values for stochastic matching
     cat(sprintf("\r%-50s", "Selecting the unexposed population...."))
     sampled_df_Un <- sampled_df[
       group == "control",
@@ -167,38 +167,38 @@ match_cohorts <- function(matching_pop_groupkey = NULL,
     rm(sampled_df)
     gc()
 
-    ########################################################################
-    #### We're going to send these dataframes to Duckdb to do the magic ####
-    ########################################################################
-
+    # Load exposed and control populations into DuckDB temporary tables for SQL matching
     df_bootstrap <- data.frame(boot_id = bootstrap)
 
     cat(sprintf("\r%-50s", "Sending data to DuckDB...."))
+    # Write exposed population to DuckDB
     DBI::dbWriteTable(matching_conn, DBI::SQL("dfexp"), sampled_df_Exp, overwrite = TRUE, temporary = TRUE)
+    # Write control population to DuckDB
     DBI::dbWriteTable(matching_conn, DBI::SQL("dfun"), sampled_df_Un, overwrite = TRUE, temporary = TRUE)
+    # Write bootstrap iteration ID to DuckDB
     DBI::dbWriteTable(matching_conn, DBI::SQL("dfbootstrap"), as.data.frame(df_bootstrap), overwrite = TRUE)
 
     rm(sampled_df_Exp, sampled_df_Un)
     gc()
 
-    ################################
-    #### Now we do the matching ####
-    ################################
-
+    # Execute matching query for each year-of-birth stratum
     for (year in min_year:max_year) {
       cat(sprintf("\rDoing year_of_birth loops, %d%% ready....", round(((year - min_year) / (max_year - min_year)) * 100)))
 
+      # Customize matching query for current year-of-birth stratum
       matching_query_adjusted <- gsub(
         "year_of_birth = 1920",
         paste0("year_of_birth = ", year),
         matching_query
       )
+      # Adjust age tolerance window for year-of-birth matching
       matching_query_adjusted <- gsub(
         "year_of_birth BETWEEN 1919 AND 1921",
         paste0("year_of_birth BETWEEN ", year - 1, " AND ", year + 1),
         matching_query_adjusted
       )
 
+      # Modify join type if bootstrap enabled: ensure person used matches once only
       if (with_bootstrap) {
         matching_query_adjusted <- gsub(
           "LEFT JOIN matched_persons M",
@@ -207,25 +207,27 @@ match_cohorts <- function(matching_pop_groupkey = NULL,
         )
       }
 
+      # Execute adjusted matching query and store results in DuckDB
       matched_pop_year <- DBI::dbExecute(matching_conn, matching_query_adjusted)
     }
 
+    # Log round completion time
     toc_log_print()
   }
 
+  # Signal end of bootstrap iterations
   logr::log_print(c("[MATCHING] - END"))
 
-  #############################################################################################
-  #### Now that we've done the matching / bootstrapping it's time to read it all back to R ####
-  #############################################################################################
-
+  # Read all matching results from DuckDB back into R for post-processing
   logr::log_print("[MATCHING] - Reading matching dataset back into R")
 
   match_results <- DBI::dbReadTable(matching_conn, "match_result")
   data.table::setDT(match_results)
 
+  # Convert integer date encoding back to calendar dates
   origin_date <- as.Date("1970-01-01")
 
+  # Join results with profile table and decode dates, assign match IDs
   match_results_rebuilt <- match_results[
     profile_table,
     on = "groupkey",
@@ -250,7 +252,7 @@ match_cohorts <- function(matching_pop_groupkey = NULL,
     with = FALSE
   ]
 
-  # Exposed + unmatched
+  # Format exposed records with treatment group labels (EXPOSED or UNMATCHED)
   match_results_rebuilt_long_exposed <- data.table::copy(match_results_rebuilt)[
     ,
     (col_treatment_group) := data.table::fifelse(
@@ -263,7 +265,7 @@ match_cohorts <- function(matching_pop_groupkey = NULL,
     with = FALSE
   ]
 
-  # Matched controls
+  # Format control records with treatment group label as CONTROL (only matched controls)
   match_results_rebuilt_long_control <- match_results_rebuilt[
     !is.na(idun)
   ][
@@ -275,7 +277,7 @@ match_cohorts <- function(matching_pop_groupkey = NULL,
     with = FALSE
   ]
 
-  # Combine
+  # Combine exposed and control records into long format output
   match_results_rebuilt_long <- data.table::rbindlist(
     list(
       match_results_rebuilt_long_exposed,
@@ -285,6 +287,7 @@ match_cohorts <- function(matching_pop_groupkey = NULL,
     fill = TRUE
   )[
     ,
+    # Merge date columns from both groups and extract appropriate person ID
     c(
       col_matching_status_start,
       col_matching_status_end,
@@ -297,6 +300,7 @@ match_cohorts <- function(matching_pop_groupkey = NULL,
       )
   ][
     ,
+    # Select and order final output columns
     c(
       col_person_id, col_match_id, "boot_id", col_T0, col_treatment_group,
       col_matching_status_start, col_matching_status_end,
@@ -307,6 +311,7 @@ match_cohorts <- function(matching_pop_groupkey = NULL,
 
   logr::log_print("[MATCHING] - Done reading matching dataset back into R")
 
+  # Optionally save results to parquet file on disk
   if (save_output) {
     output_file_path <- if (!with_bootstrap) {
       file.path(result_dir, paste0(result_file, ".parquet"))
@@ -316,10 +321,9 @@ match_cohorts <- function(matching_pop_groupkey = NULL,
     logr::log_print(paste0("[MATCHING] - ", output_file_path, " saved to disk successfully."))
   }
 
+  # Return results if not bootstrapping and not saving to disk
   if (!with_bootstrap & !save_output) {
     logr::log_print("[MATCHING] `save_output` set to FALSE, returning matching results")
     return(match_results_rebuilt_long)
   }
 }
-
-
