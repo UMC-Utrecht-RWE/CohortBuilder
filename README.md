@@ -56,7 +56,7 @@ matching_query <- getSQL(
 | `get_matching_variables()`            | Validate and subset matching variables          |
 | `get_profile_table()`                 | Build the groupkey lookup table                 |
 | `get_matching_population()`           | Prepare the exposed/control pool                |
-| `match_cohorts_with_replacement)`     | SQL matching with optional bootstrap            |
+| `match_cohorts_with_replacement()`    | SQL matching with optional bootstrap            |
 | `match_cohorts_without_replacement()` | Greedy no-replacement matching                  |
 | `getSQL()`                            | Read a `.sql` file into a single string         |
 | `toc_log_print()`                     | Log elapsed time from a `tictoc` timer          |
