@@ -208,7 +208,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
       }
 
       # Execute adjusted matching query and store results in DuckDB
-      matched_pop_year <- DBI::dbExecute(matching_conn, matching_query_adjusted)
+      DBI::dbExecute(matching_conn, matching_query_adjusted)
     }
 
     # Log round completion time
@@ -322,7 +322,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
   }
 
   # Return results if not bootstrapping and not saving to disk
-  if (!with_bootstrap & !save_output) {
+  if (!with_bootstrap && !save_output) {
     logr::log_print("[MATCHING] `save_output` set to FALSE, returning matching results")
     return(match_results_rebuilt_long)
   }
