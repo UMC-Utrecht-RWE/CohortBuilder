@@ -1,6 +1,6 @@
 # Match cohorts (with replacement / bootstrap) ----------------------------
 
-#' Match Cohorts with Optional Bootstrapping
+#' Match Cohorts with Replacement and Optional Bootstrapping
 #'
 #' This function performs matching between exposed and control populations within a study cohort,
 #' with optional bootstrapping to account for variability in the results. Matching is performed
@@ -46,27 +46,27 @@
 #' }
 #'
 #' @export
-match_cohorts <- function(matching_pop_groupkey = NULL,
-                          matching_vars = NULL,
-                          profile_table = NULL,
-                          matching_query = NULL,
-                          target_table_query = NULL,
-                          matching_conn = NULL,
-                          result_dir = NULL,
-                          result_file = NULL,
-                          save_output = FALSE,
-                          dir_bootstrap = NULL,
-                          with_bootstrap = FALSE,
-                          n_bootstraps = 500,
-                          n_cores = NULL,
-                          start_seed = 42,
-                          col_person_id = "person_id",
-                          col_match_id = "match_id",
-                          col_treatment_group = "group",
-                          col_T0 = "T0",
-                          col_matching_status_start = "matching_status_start",
-                          col_matching_status_end = "matching_status_end",
-                          col_age_iterator = "year_of_birth") {
+match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
+                                           matching_vars = NULL,
+                                           profile_table = NULL,
+                                           matching_query = NULL,
+                                           target_table_query = NULL,
+                                           matching_conn = NULL,
+                                           result_dir = NULL,
+                                           result_file = NULL,
+                                           save_output = FALSE,
+                                           dir_bootstrap = NULL,
+                                           with_bootstrap = FALSE,
+                                           n_bootstraps = 500,
+                                           n_cores = NULL,
+                                           start_seed = 42,
+                                           col_person_id = "person_id",
+                                           col_match_id = "match_id",
+                                           col_treatment_group = "group",
+                                           col_T0 = "T0",
+                                           col_matching_status_start = "matching_status_start",
+                                           col_matching_status_end = "matching_status_end",
+                                           col_age_iterator = "year_of_birth") {
   # Configure DuckDB connection and thread count for SQL execution
   if (is.null(n_cores)) {
     n_cores <- parallel::detectCores() - 1

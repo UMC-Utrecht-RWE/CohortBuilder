@@ -224,7 +224,7 @@ build_study_cohort <- function(eligible_pop = NULL,
   matching_conn <- DBI::dbConnect(duckdb::duckdb(), dir_matching_db)
 
   if (matching_mode == "with_replacement") {
-    D4_MSC <- match_cohorts(
+    D4_MSC <- match_cohorts_with_replacement(
       matching_pop_groupkey = D3_MATCHING_POP,
       profile_table = D3_LOOKUP_TABLE,
       matching_query = matching_query,
