@@ -8,8 +8,12 @@
 #' obtaining the eligible matching population, and performing matching.
 #'
 #' @param eligible_pop A data frame containing the eligible population (e.g., `D3_ELIGIBILITY`).
-#' @param matching_query A string defining the matching SQL query.
+#' @param matching_query A string defining the matching SQL query. If `NULL`, empty,
+#'   or whitespace-only, the packaged default SQL query is loaded automatically based
+#'   on `matching_mode`.
 #' @param target_table_query A string defining the DB table query that will be used to hold the birth-year looped matching results.
+#'   For `matching_mode = "with_replacement"`, if `NULL`, empty, or whitespace-only,
+#'   the packaged default target-table SQL is loaded automatically.
 #' @param matching_vars A character vector of matching variables. Default includes
 #'   demographic and risk-related variables such as `c("SV_SEX", "SV_REGION",
 #'   "SV_HIST_COVID_VACC", "SV_BRAND_COVID_VACC", "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED",
@@ -139,6 +143,37 @@ build_study_cohort <- function(eligible_pop = NULL,
     .ensure_directory(matching_db_dir, "matching database")
   }
 
+  if (!matching_mode %in% c("with_replacement", "without_replacement")) {
+    stop("`matching_mode` must be either 'with_replacement' or 'without_replacement'.")
+  }
+
+  if (is_empty_query(matching_query)) {
+    default_matching_query_file <- switch(matching_mode,
+      with_replacement = "matching_query_with_replacement.sql",
+      without_replacement = "matching_query_without_replacement.sql"
+    )
+
+    default_matching_query_path <- system.file("sql_queries", default_matching_query_file, package = "CohortBuilder")
+    if (!nzchar(default_matching_query_path)) {
+      stop(paste0("Could not locate default SQL query file: ", default_matching_query_file))
+    }
+
+    matching_query <- getSQL(default_matching_query_path)
+    logr::log_print(paste0("[MATCHING] - Loaded default matching SQL from ", default_matching_query_file, "."))
+  }
+
+  if (matching_mode == "with_replacement" && is_empty_query(target_table_query)) {
+    default_target_table_query_file <- "create_matching_target_table.sql"
+    default_target_table_query_path <- system.file("sql_queries", default_target_table_query_file, package = "CohortBuilder")
+
+    if (!nzchar(default_target_table_query_path)) {
+      stop(paste0("Could not locate default target-table SQL file: ", default_target_table_query_file))
+    }
+
+    target_table_query <- getSQL(default_target_table_query_path)
+    logr::log_print(paste0("[MATCHING] - Loaded default target-table SQL from ", default_target_table_query_file, "."))
+  }
+
   set_matching_environment(
     eligible_pop = eligible_pop,
     matching_query = matching_query,
@@ -219,10 +254,6 @@ build_study_cohort <- function(eligible_pop = NULL,
   ###########################################
   #### Match with optional bootstrapping ####
   ###########################################
-
-  if (!matching_mode %in% c("with_replacement", "without_replacement")) {
-    stop("`matching_mode` must be either 'with_replacement' or 'without_replacement'.")
-  }
 
   matching_conn <- DBI::dbConnect(duckdb::duckdb(), dir_matching_db)
 

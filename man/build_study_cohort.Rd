@@ -34,9 +34,13 @@ build_study_cohort(
 \arguments{
 \item{eligible_pop}{A data frame containing the eligible population (e.g., \code{D3_ELIGIBILITY}).}
 
-\item{matching_query}{A string defining the matching SQL query.}
+\item{matching_query}{A string defining the matching SQL query. If \code{NULL}, empty,
+or whitespace-only, the packaged default SQL query is loaded automatically based
+on \code{matching_mode}.}
 
-\item{target_table_query}{A string defining the DB table query that will be used to hold the birth-year looped matching results.}
+\item{target_table_query}{A string defining the DB table query that will be used to hold the birth-year looped matching results.
+For \code{matching_mode = "with_replacement"}, if \code{NULL}, empty, or whitespace-only,
+the packaged default target-table SQL is loaded automatically.}
 
 \item{matching_vars}{A character vector of matching variables. Default includes
 demographic and risk-related variables such as \code{c("SV_SEX", "SV_REGION", "SV_HIST_COVID_VACC", "SV_BRAND_COVID_VACC", "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED", "CDC_RISK", "SV_SES_STATUS", "bivalent_type_received")}.}
