@@ -300,14 +300,34 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
       )
   ][
     ,
-    # Select and order final output columns
-    c(
-      col_person_id, col_match_id, "boot_id", col_T0, col_treatment_group,
-      col_matching_status_start, col_matching_status_end,
-      matching_vars
-    ),
+    # Drop intermediate person-id columns from wide representation
+    !c("idexp", "idun"),
     with = FALSE
   ]
+
+  # Ensure the requested age iterator column is always available in output
+  age_lookup <- data.table::as.data.table(matching_pop_groupkey)[
+    , .(
+      age_value = {
+        vals <- as.integer(get(col_age_iterator))
+        vals <- vals[!is.na(vals)]
+        if (length(vals) > 0L) vals[1L] else NA_integer_
+      }
+    ),
+    by = .(person_id = as.character(get(col_person_id)))
+  ]
+  age_idx <- match(match_results_rebuilt_long[[col_person_id]], age_lookup$person_id)
+  match_results_rebuilt_long[, (col_age_iterator) := age_lookup$age_value[age_idx]]
+
+  # Select and order final output columns
+  out_cols <- c(
+    col_person_id, col_match_id, "boot_id", col_T0, col_treatment_group,
+    col_matching_status_start, col_matching_status_end, col_age_iterator,
+    matching_vars
+  )
+  out_cols <- unique(out_cols)
+  out_cols <- out_cols[out_cols %in% colnames(match_results_rebuilt_long)]
+  match_results_rebuilt_long <- match_results_rebuilt_long[, ..out_cols]
 
   logr::log_print("[MATCHING] - Done reading matching dataset back into R")
 

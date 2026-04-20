@@ -160,10 +160,12 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
     empty[, (col_T0) := as.Date(character())]
     empty[, (col_matching_status_start) := as.Date(character())]
     empty[, (col_matching_status_end) := as.Date(character())]
+    empty[, (col_age_iterator) := integer()]
     out_cols <- c(
       col_person_id, col_match_id, "boot_id", col_treatment_group,
-      col_T0, col_matching_status_start, col_matching_status_end, matching_vars
+      col_T0, col_matching_status_start, col_matching_status_end, col_age_iterator, matching_vars
     )
+    out_cols <- unique(out_cols)
     out <- empty[, ..out_cols]
     # Optionally save empty result to disk
     if (isTRUE(save_output)) {
@@ -347,11 +349,26 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
     skip_absent = TRUE
   )
 
+  # Ensure the requested age iterator column is always available in output
+  age_lookup <- data.table::as.data.table(matching_pop_groupkey)[
+    , .(
+      age_value = {
+        vals <- as.integer(get(col_age_iterator))
+        vals <- vals[!is.na(vals)]
+        if (length(vals) > 0L) vals[1L] else NA_integer_
+      }
+    ),
+    by = .(person_id = as.character(get(col_person_id)))
+  ]
+  age_idx <- match(match_results_long[[col_person_id]], age_lookup$person_id)
+  match_results_long[, (col_age_iterator) := age_lookup$age_value[age_idx]]
+
   # Select and order final output columns in desired sequence
   out_cols <- c(
     col_person_id, col_match_id, "boot_id", col_treatment_group,
-    col_T0, col_matching_status_start, col_matching_status_end, matching_vars
+    col_T0, col_matching_status_start, col_matching_status_end, col_age_iterator, matching_vars
   )
+  out_cols <- unique(out_cols)
   out_cols <- out_cols[out_cols %in% colnames(match_results_long)]
   match_results_long <- match_results_long[, ..out_cols]
 

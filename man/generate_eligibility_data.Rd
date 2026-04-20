@@ -44,7 +44,7 @@ The function generates various attributes, including:
 \item \strong{COMP_COMORBIDITIES}: Presence of comorbidities.
 \item \strong{receives_any_covidvaccine}: Indicates if any COVID vaccine was received.
 \item \strong{receives_bivalent}: Indicates if a bivalent vaccine was received.
-\item \strong{matching_status_start}: Start date of matching eligibility.
+\item \strong{start}: Start date of matching eligibility.
 \item Additional derived variables like age, eligibility, and exposure status.
 }
 
