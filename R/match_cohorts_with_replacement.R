@@ -96,6 +96,11 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
   for (bootstrap in 1:n_bootstraps) {
     tictoc::tic()
 
+    # If no bootstrapping, set bootstrap iteration to 0
+    if (!with_bootstrap) {
+      bootstrap <- 0
+    }
+
     # Log current bootstrap iteration progress
     logr::log_print(paste0("Doing iteration ", bootstrap, " of ", n_bootstraps, ".... \n"))
 
