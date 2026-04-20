@@ -127,7 +127,7 @@ build_study_cohort <- function(eligible_pop = NULL,
   #### Set up the matching environment ####
   #########################################
 
-  logr::log_open(logdir = TRUE, file_name = log_name)
+  logr::log_open(logdir = "logs", file_name = log_name)
   logr::log_print(c("[MATCHING] - Setting up matching environment"))
 
   .ensure_directory(output_pars$dir_output, "output")
