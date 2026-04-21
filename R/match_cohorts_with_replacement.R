@@ -67,6 +67,35 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
                                            col_matching_status_start = "matching_status_start",
                                            col_matching_status_end = "matching_status_end",
                                            col_age_iterator = "year_of_birth") {
+  # Load packaged defaults when SQL queries are not provided
+  if (is_empty_query(matching_query)) {
+    default_matching_query_file <- "matching_query_with_replacement.sql"
+    default_matching_query_path <- system.file("sql_queries", default_matching_query_file, package = "CohortBuilder")
+
+    if (!nzchar(default_matching_query_path)) {
+      stop(paste0("Could not locate default SQL query file: ", default_matching_query_file))
+    }
+
+    matching_query <- getSQL(default_matching_query_path)
+    msg <- paste0("`matching_query` not specified. Falling back to packaged default: ", default_matching_query_file, ".")
+    message(msg)
+    logr::log_print(paste0("[MATCHING] - ", msg))
+  }
+
+  if (is_empty_query(target_table_query)) {
+    default_target_table_query_file <- "create_matching_target_table.sql"
+    default_target_table_query_path <- system.file("sql_queries", default_target_table_query_file, package = "CohortBuilder")
+
+    if (!nzchar(default_target_table_query_path)) {
+      stop(paste0("Could not locate default target-table SQL file: ", default_target_table_query_file))
+    }
+
+    target_table_query <- getSQL(default_target_table_query_path)
+    msg <- paste0("`target_table_query` not specified. Falling back to packaged default: ", default_target_table_query_file, ".")
+    message(msg)
+    logr::log_print(paste0("[MATCHING] - ", msg))
+  }
+
   # Configure DuckDB connection and thread count for SQL execution
   if (is.null(n_cores)) {
     n_cores <- parallel::detectCores() - 1

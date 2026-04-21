@@ -113,9 +113,19 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
                                               col_matching_status_start = "matching_status_start",
                                               col_matching_status_end = "matching_status_end",
                                               col_age_iterator = "year_of_birth") {
-  # Validate required parameters
-  if (is.null(matching_query)) {
-    stop("`matching_query` must be provided for `match_cohorts_without_replacement`.")
+  # Load packaged default SQL when query is not provided
+  if (is_empty_query(matching_query)) {
+    default_matching_query_file <- "matching_query_without_replacement.sql"
+    default_matching_query_path <- system.file("sql_queries", default_matching_query_file, package = "CohortBuilder")
+
+    if (!nzchar(default_matching_query_path)) {
+      stop(paste0("Could not locate default SQL query file: ", default_matching_query_file))
+    }
+
+    matching_query <- getSQL(default_matching_query_path)
+    msg <- paste0("`matching_query` not specified. Falling back to packaged default: ", default_matching_query_file, ".")
+    message(msg)
+    logr::log_print(paste0("[MATCHING-NR] - ", msg))
   }
 
   # Configure number of CPU threads for DuckDB
