@@ -28,6 +28,8 @@ build_study_cohort(
     "matching_status_end", col_age_iterator = "year_of_birth"),
   output_column_names = list(col_person_id = "person_id", col_match_id = "match_id",
     col_treatment_group = "group", col_T0 = "T0"),
+  diagnostic_pars = list(compute_diagnostics = FALSE, save_diagnostics = FALSE,
+    dir_diagnostics = NULL, include_plots = TRUE, top_n_profiles = 20),
   matching_mode = "with_replacement"
 )
 }
@@ -94,12 +96,23 @@ which uses all available cores minus one.}
 \item{\code{col_T0}}{Column name for the T0 variable. Default is \code{"T0"}.}
 }}
 
+\item{diagnostic_pars}{A list controlling optional matching diagnostics:
+\describe{
+\item{\code{compute_diagnostics}}{Logical. If \code{TRUE}, computes variable-level and profile-level matching diagnostics. Default is \code{FALSE}.}
+\item{\code{save_diagnostics}}{Logical. If \code{TRUE}, saves diagnostics tables as \code{.csv} files and available plots as \code{.png} files. Default is \code{FALSE}.}
+\item{\code{dir_diagnostics}}{Directory where diagnostics will be saved. Defaults to \code{file.path(output_pars$dir_output, "matching_diagnostics")}.}
+\item{\code{include_plots}}{Logical. If \code{TRUE}, includes \code{ggplot2} plot objects when \code{ggplot2} is installed. Default is \code{TRUE}.}
+\item{\code{top_n_profiles}}{Integer number of high-unmatched profiles to retain in the profile bottleneck table. Default is \code{20}.}
+}}
+
 \item{matching_mode}{Matching strategy. Use \code{"with_replacement"} (default) for the
 existing SQL matcher, or \code{"without_replacement"} for greedy no-replacement matching.}
 }
 \value{
-A data.table containing the matched study cohort. If \code{output_pars$save_output} is \code{TRUE},
-the data frame is also saved to disk as a \code{.parquet} file.
+A data.table containing the matched study cohort. When diagnostics are computed
+and the matched cohort is returned to the caller, the diagnostics object is attached as
+the \code{"matching_diagnostics"} attribute. If \code{output_pars$save_output} is \code{TRUE}, the data
+frame is also saved to disk as a \code{.parquet} file.
 }
 \description{
 This function serves as a wrapper to perform matching for a matched study cohort,

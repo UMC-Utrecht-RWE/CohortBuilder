@@ -141,6 +141,13 @@ generate_eligibility_data <- function(n = 10000, start_seed = 42, save_output, o
     by = person_id
   ]
 
+  # Add schema aliases for matching_status columns
+  # These map to start and end for compatibility with build_study_cohort defaults
+  D3_ELIGIBILITY[, `:=`(
+    matching_status_start = start,
+    matching_status_end = end
+  )]
+
   logr::log_print(paste0("[MATCHING] - ", output_file, " created successfully"))
 
   if (save_output) {

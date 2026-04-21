@@ -123,5 +123,11 @@ build_study_cohort(
     col_treatment_group = "group",
     col_T0 = "T0"
   ),
+  diagnostic_pars = list(
+    compute_diagnostics = FALSE,
+    save_diagnostics = FALSE,
+    include_plots = TRUE,
+    top_n_profiles = 10L
+  ),
   matching_mode = "without_replacement"
 )

@@ -37,48 +37,52 @@ run_pipeline <- function(d3, seed = 42L) {
   )
   db_path <- tempfile(fileext = ".duckdb")
 
-  d4 <- data.table::as.data.table(
-    build_study_cohort(
-      eligible_pop = d3,
-      matching_query = matching_query,
-      target_table_query = target_table_query,
-      matching_vars = matching_vars,
-      dir_matching_db = db_path,
-      n_cores = NULL,
-      log_name = file.path(tempdir(), "log_test"),
-      output_pars = list(
-        save_output = FALSE,
-        dir_output = tempdir(),
-        output_file_name = "D4_MSC_TEST"
-      ),
-      intermediate_output_pars = list(
-        save_intermediate_outputs = FALSE,
-        dir_intermediate_outputs = tempdir(),
-        profile_table_name = "D3_LOOKUP_TABLE",
-        matching_pop_name = "D3_MATCHING_POP"
-      ),
-      bootstrap_pars = list(
-        with_bootstrap = FALSE,
-        n_bootstraps = 1L,
-        dir_bootstrap = tempdir(),
-        start_seed = as.integer(seed)
-      ),
-      input_column_names = list(
-        col_person_id = "person_id",
-        col_eligible_exposed = "eligible_exposed",
-        col_eligible_control = "eligible_control",
-        col_matching_status_start = "matching_status_start",
-        col_matching_status_end = "matching_status_end",
-        col_age_iterator = "year_of_birth"
-      ),
-      output_column_names = list(
-        col_person_id = "person_id",
-        col_match_id = "match_id",
-        col_treatment_group = "group",
-        col_T0 = "T0"
-      ),
-      matching_mode = "without_replacement"
-    )
+  d4 <- build_study_cohort(
+    eligible_pop = d3,
+    matching_query = matching_query,
+    target_table_query = target_table_query,
+    matching_vars = matching_vars,
+    dir_matching_db = db_path,
+    n_cores = NULL,
+    log_name = file.path(tempdir(), "log_test"),
+    output_pars = list(
+      save_output = FALSE,
+      dir_output = tempdir(),
+      output_file_name = "D4_MSC_TEST"
+    ),
+    intermediate_output_pars = list(
+      save_intermediate_outputs = FALSE,
+      dir_intermediate_outputs = tempdir(),
+      profile_table_name = "D3_LOOKUP_TABLE",
+      matching_pop_name = "D3_MATCHING_POP"
+    ),
+    bootstrap_pars = list(
+      with_bootstrap = FALSE,
+      n_bootstraps = 1L,
+      dir_bootstrap = tempdir(),
+      start_seed = as.integer(seed)
+    ),
+    input_column_names = list(
+      col_person_id = "person_id",
+      col_eligible_exposed = "eligible_exposed",
+      col_eligible_control = "eligible_control",
+      col_matching_status_start = "start",
+      col_matching_status_end = "end",
+      col_age_iterator = "year_of_birth"
+    ),
+    output_column_names = list(
+      col_person_id = "person_id",
+      col_match_id = "match_id",
+      col_treatment_group = "group",
+      col_T0 = "T0"
+    ),
+    diagnostic_pars = list(
+      compute_diagnostics = FALSE,
+      save_diagnostics = FALSE,
+      include_plots = FALSE,
+      top_n_profiles = 10L
+    ),
+    matching_mode = "without_replacement"
   )
 
   list(d3 = d3, d4 = d4, matching_vars = c(
@@ -169,4 +173,152 @@ test_that("matching variables are identical within each matched pair", {
       label = paste0("matching variable `", v, "` is equal within each pair")
     )
   }
+})
+
+test_that("matching diagnostics return expected tables and variable coverage", {
+  d3 <- make_d3(n_spells = 5e4)
+  res <- run_pipeline(d3)
+
+  diagnostics <- get_matching_diagnostics(
+    eligible_pop = res$d3,
+    matched_cohort = res$d4,
+    matching_vars = res$matching_vars,
+    include_plots = FALSE,
+    top_n_profiles = 8L
+  )
+
+  expect_s3_class(diagnostics, "matching_diagnostics")
+  expect_named(
+    diagnostics$tables,
+    c("variable_level_summary", "variable_bottleneck_summary", "profile_bottleneck_summary")
+  )
+  expect_true(all(res$matching_vars %chin% diagnostics$tables$variable_level_summary$matching_variable))
+  expect_true(all(res$matching_vars %chin% diagnostics$tables$variable_bottleneck_summary$matching_variable))
+  expect_lte(nrow(diagnostics$tables$profile_bottleneck_summary), 8L)
+})
+
+test_that("build_study_cohort attaches diagnostics when requested", {
+  d3 <- make_d3(n_spells = 5e4)
+
+  matching_vars <- c(
+    "SV_SEX", "SV_REGION", "SV_HIST_COVID_VACC", "SV_PRIOR_COVID_DG", "SV_BRAND_COVID_VACC",
+    "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED", "CDC_RISK", "SV_SES_STATUS"
+  )
+
+  matching_query <- suppressWarnings(
+    getSQL(system.file("sql_queries", "matching_query_without_replacement.sql", package = "CohortBuilder"))
+  )
+  target_table_query <- getSQL(
+    system.file("sql_queries", "create_matching_target_table.sql", package = "CohortBuilder")
+  )
+
+  d4 <- data.table::as.data.table(
+    build_study_cohort(
+      eligible_pop = d3,
+      matching_query = matching_query,
+      target_table_query = target_table_query,
+      matching_vars = matching_vars,
+      dir_matching_db = tempfile(fileext = ".duckdb"),
+      log_name = file.path(tempdir(), "log_test_diag"),
+      output_pars = list(
+        save_output = FALSE,
+        dir_output = tempdir(),
+        output_file_name = "D4_MSC_TEST"
+      ),
+      intermediate_output_pars = list(
+        save_intermediate_outputs = FALSE,
+        dir_intermediate_outputs = tempdir(),
+        profile_table_name = "D3_LOOKUP_TABLE",
+        matching_pop_name = "D3_MATCHING_POP"
+      ),
+      bootstrap_pars = list(
+        with_bootstrap = FALSE,
+        n_bootstraps = 1L,
+        dir_bootstrap = tempdir(),
+        start_seed = 42L
+      ),
+      diagnostic_pars = list(
+        compute_diagnostics = TRUE,
+        save_diagnostics = FALSE,
+        include_plots = FALSE,
+        top_n_profiles = 12L
+      ),
+      matching_mode = "without_replacement"
+    )
+  )
+
+  diagnostics <- attr(d4, "matching_diagnostics")
+  expect_s3_class(diagnostics, "matching_diagnostics")
+  expect_true(nrow(diagnostics$tables$variable_level_summary) > 0L)
+})
+
+test_that("matching study cohort output has class matching_study_cohort", {
+  d3 <- make_d3()
+  res <- run_pipeline(d3)
+  expect_s3_class(res$d4, "matching_study_cohort")
+  expect_s3_class(res$d4, "data.table")
+})
+
+test_that("summary method works on matching study cohort", {
+  d3 <- make_d3()
+  res <- run_pipeline(d3)
+  d4 <- res$d4
+
+  # summary() should return a list with two elements (invisibly)
+  summary_result <- capture.output({
+    invisible_result <- summary(d4)
+  })
+
+  # Check that summary output was printed
+  expect_true(length(summary_result) > 0L)
+  expect_true(any(grepl("Episodes by Matching Status", summary_result)))
+  expect_true(any(grepl("Distribution of Control Usage", summary_result)))
+})
+
+test_that("summary method shows correct episode counts", {
+  d3 <- make_d3()
+  res <- run_pipeline(d3)
+  d4 <- res$d4
+
+  # Capture output and check control usage stats
+  summary_result <- capture.output({
+    invisible_result <- summary(d4)
+  })
+
+  # Check that key statistics are shown
+  summary_text <- paste(summary_result, collapse = "\n")
+  expect_true(any(grepl("Total Episodes", summary_text)))
+  expect_true(any(grepl("Total Unique Control Person IDs|No matched controls", summary_text)))
+})
+
+test_that("plot method works on matching study cohort with default T0 histogram", {
+  d3 <- make_d3()
+  res <- run_pipeline(d3)
+  d4 <- res$d4
+
+  # ggplot2 may or may not be installed; both should work without error
+  expect_silent({
+    plot(d4)
+  })
+})
+
+test_that("plot method works on matching study cohort with user-specified by_var", {
+  d3 <- make_d3()
+  res <- run_pipeline(d3)
+  d4 <- res$d4
+
+  expect_silent({
+    plot(d4, by_var = "group")
+  })
+})
+
+test_that("plot method validates by_var parameter", {
+  d3 <- make_d3()
+  res <- run_pipeline(d3)
+  d4 <- res$d4
+
+  expect_error(
+    plot(d4, by_var = "not_a_column"),
+    "Missing required columns"
+  )
 })

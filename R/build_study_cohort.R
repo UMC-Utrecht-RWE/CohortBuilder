@@ -59,11 +59,21 @@
 #'     \item{`col_treatment_group`}{Column name for the treatment group. Default is `"group"`.}
 #'     \item{`col_T0`}{Column name for the T0 variable. Default is `"T0"`.}
 #'   }
+#' @param diagnostic_pars A list controlling optional matching diagnostics:
+#'   \describe{
+#'     \item{`compute_diagnostics`}{Logical. If `TRUE`, computes variable-level and profile-level matching diagnostics. Default is `FALSE`.}
+#'     \item{`save_diagnostics`}{Logical. If `TRUE`, saves diagnostics tables as `.csv` files and available plots as `.png` files. Default is `FALSE`.}
+#'     \item{`dir_diagnostics`}{Directory where diagnostics will be saved. Defaults to `file.path(output_pars$dir_output, "matching_diagnostics")`.}
+#'     \item{`include_plots`}{Logical. If `TRUE`, includes `ggplot2` plot objects when `ggplot2` is installed. Default is `TRUE`.}
+#'     \item{`top_n_profiles`}{Integer number of high-unmatched profiles to retain in the profile bottleneck table. Default is `20`.}
+#'   }
 #' @param matching_mode Matching strategy. Use `"with_replacement"` (default) for the
 #'   existing SQL matcher, or `"without_replacement"` for greedy no-replacement matching.
 #'
-#' @return A data.table containing the matched study cohort. If `output_pars$save_output` is `TRUE`,
-#'   the data frame is also saved to disk as a `.parquet` file.
+#' @return A data.table containing the matched study cohort. When diagnostics are computed
+#'   and the matched cohort is returned to the caller, the diagnostics object is attached as
+#'   the `"matching_diagnostics"` attribute. If `output_pars$save_output` is `TRUE`, the data
+#'   frame is also saved to disk as a `.parquet` file.
 #'
 #' @details
 #' The function integrates several components of the matching pipeline:
@@ -125,6 +135,13 @@ build_study_cohort <- function(eligible_pop = NULL,
                                  col_match_id = "match_id",
                                  col_treatment_group = "group",
                                  col_T0 = "T0"
+                               ),
+                               diagnostic_pars = list(
+                                 compute_diagnostics = FALSE,
+                                 save_diagnostics = FALSE,
+                                 dir_diagnostics = NULL,
+                                 include_plots = TRUE,
+                                 top_n_profiles = 20
                                ),
                                matching_mode = "with_replacement") {
   #########################################
@@ -303,6 +320,49 @@ build_study_cohort <- function(eligible_pop = NULL,
     )
   }
 
+  diagnostics_obj <- NULL
+  diagnostics_requested <- isTRUE(diagnostic_pars$compute_diagnostics) || isTRUE(diagnostic_pars$save_diagnostics)
+
+  if (diagnostics_requested) {
+    if (isTRUE(bootstrap_pars$with_bootstrap)) {
+      logr::log_print("[MATCHING] - Diagnostics skipped because bootstrap matching does not return a single final cohort.")
+      warning("Diagnostics are currently skipped when `with_bootstrap = TRUE`.")
+    } else {
+      matched_for_diagnostics <- D4_MSC
+
+      if (is.null(matched_for_diagnostics) && isTRUE(output_pars$save_output)) {
+        saved_output_path <- file.path(output_pars$dir_output, paste0(output_pars$output_file_name, ".parquet"))
+        if (file.exists(saved_output_path)) {
+          matched_for_diagnostics <- data.table::as.data.table(arrow::read_parquet(saved_output_path))
+        }
+      }
+
+      if (!is.null(matched_for_diagnostics)) {
+        diagnostics_obj <- get_matching_diagnostics(
+          eligible_pop = eligible_pop,
+          matched_cohort = matched_for_diagnostics,
+          matching_vars = matching_vars,
+          input_column_names = input_column_names,
+          output_column_names = output_column_names,
+          top_n_profiles = if (is.null(diagnostic_pars$top_n_profiles)) 20 else diagnostic_pars$top_n_profiles,
+          include_plots = if (is.null(diagnostic_pars$include_plots)) TRUE else isTRUE(diagnostic_pars$include_plots)
+        )
+
+        if (isTRUE(diagnostic_pars$save_diagnostics)) {
+          diagnostics_dir <- diagnostic_pars$dir_diagnostics
+          if (is.null(diagnostics_dir)) {
+            diagnostics_dir <- file.path(output_pars$dir_output, "matching_diagnostics")
+          }
+
+          .save_matching_diagnostics(diagnostics_obj, diagnostics_dir)
+          logr::log_print(paste0("[MATCHING] - Saved matching diagnostics to ", diagnostics_dir, "."))
+        }
+      } else {
+        logr::log_print("[MATCHING] - Diagnostics requested but no matched cohort was available for post-processing.")
+      }
+    }
+  }
+
   DBI::dbDisconnect(matching_conn, shutdown = TRUE)
   rm(matching_conn)
   invisible(gc())
@@ -317,6 +377,11 @@ build_study_cohort <- function(eligible_pop = NULL,
   logr::log_close(footer = TRUE)
 
   if (!bootstrap_pars$with_bootstrap && !output_pars$save_output) {
+    if (!is.null(diagnostics_obj)) {
+      attr(D4_MSC, "matching_diagnostics") <- diagnostics_obj
+    }
+    # Assign class for S3 methods (summary, plot)
+    class(D4_MSC) <- c("matching_study_cohort", "data.table", "data.frame")
     return(D4_MSC)
   }
 }
