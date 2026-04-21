@@ -1,3 +1,4 @@
 *.log
 *.parquet
 *.Rproj
+*.gz
