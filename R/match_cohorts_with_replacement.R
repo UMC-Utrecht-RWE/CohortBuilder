@@ -349,6 +349,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
   # Return results if not bootstrapping and not saving to disk
   if (!with_bootstrap && !save_output) {
     logr::log_print("[MATCHING] `save_output` set to FALSE, returning matching results")
+    class(match_results_rebuilt_long) <- unique(c("matching_study_cohort", class(match_results_rebuilt_long)))
     return(match_results_rebuilt_long)
   }
 }

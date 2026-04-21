@@ -385,6 +385,7 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
 
   # Return results to environment if not saving to disk
   if (!isTRUE(save_output)) {
+    class(match_results_long) <- unique(c("matching_study_cohort", class(match_results_long)))
     return(match_results_long)
   }
 }

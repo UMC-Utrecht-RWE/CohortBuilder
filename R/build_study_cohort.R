@@ -265,9 +265,7 @@ build_study_cohort <- function(eligible_pop = NULL,
       target_table_query = target_table_query,
       matching_vars = matching_vars,
       n_cores = n_cores,
-      result_dir = output_pars$dir_output,
-      result_file = output_pars$output_file_name,
-      save_output = output_pars$save_output,
+      save_output = FALSE,
       matching_conn = matching_conn,
       dir_bootstrap = bootstrap_pars$dir_bootstrap,
       with_bootstrap = bootstrap_pars$with_bootstrap,
@@ -288,9 +286,7 @@ build_study_cohort <- function(eligible_pop = NULL,
       matching_vars = matching_vars,
       matching_query = matching_query,
       matching_conn = matching_conn,
-      result_dir = output_pars$dir_output,
-      result_file = output_pars$output_file_name,
-      save_output = output_pars$save_output,
+      save_output = FALSE,
       n_cores = n_cores,
       start_seed = bootstrap_pars$start_seed,
       col_person_id = input_column_names$col_person_id,
@@ -314,9 +310,30 @@ build_study_cohort <- function(eligible_pop = NULL,
     logr::log_print("[MATCHING] - Removed existing database.")
   }
 
+  # Write cohort to disk (non-bootstrap runs only)
+  if (!bootstrap_pars$with_bootstrap && isTRUE(output_pars$save_output)) {
+    output_file_path <- file.path(
+      output_pars$dir_output,
+      paste0(output_pars$output_file_name, ".parquet")
+    )
+    logr::log_print(paste0("[MATCHING] - Saving ", output_file_path, " to disk..."))
+    arrow::write_parquet(D4_MSC, output_file_path)
+    logr::log_print(paste0("[MATCHING] - ", output_file_path, " saved to disk successfully."))
+  }
+
+  # Log cohort summary (non-bootstrap runs only)
+  if (!bootstrap_pars$with_bootstrap) {
+    tryCatch(
+      .log_matching_summary(D4_MSC),
+      error = function(e) {
+        logr::log_print(paste0("[MATCHING] - Could not log cohort summary: ", conditionMessage(e)))
+      }
+    )
+  }
+
   logr::log_close(footer = TRUE)
 
-  if (!bootstrap_pars$with_bootstrap && !output_pars$save_output) {
+  if (!bootstrap_pars$with_bootstrap) {
     return(D4_MSC)
   }
 }
