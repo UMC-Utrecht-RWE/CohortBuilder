@@ -18,7 +18,8 @@ The main function is `build_study_cohort()`, which orchestrates the full pipelin
 ## Installation
 
 ### Using devtools:
-
+1. Download this release and place the .tat.gz file in the desired local directory
+2. Install using
 ```r
 # Install from local source
 devtools::install("/Users/smildine/Documents/GitHub/CohortBuilder")
