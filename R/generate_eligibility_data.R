@@ -46,7 +46,7 @@
 #' )
 #' }
 generate_eligibility_data <- function(n = 10000, start_seed = 42, save_output, output_dir, output_file = "D3_ELIGIBILITY") {
-  logr::log_print(paste0("[MATCHING] - Creating synthetic ", output_file))
+  logger::log_info(paste0("[MATCHING] - Creating synthetic ", output_file))
 
   # Set seed for reproducibility
   set.seed(start_seed)
@@ -141,12 +141,12 @@ generate_eligibility_data <- function(n = 10000, start_seed = 42, save_output, o
     by = person_id
   ]
 
-  logr::log_print(paste0("[MATCHING] - ", output_file, " created successfully"))
+  logger::log_info(paste0("[MATCHING] - ", output_file, " created successfully"))
 
   if (save_output) {
-    logr::log_print(paste0("[MATCHING] - Saving simulated data to ", output_dir, "/", output_file, ".parquet"))
+    logger::log_info(paste0("[MATCHING] - Saving simulated data to ", output_dir, "/", output_file, ".parquet"))
     arrow::write_parquet(D3_ELIGIBILITY, paste0(file.path(output_dir, output_file), ".parquet"))
-    logr::log_print(paste0("[MATCHING] - ", output_file, " saved successfully"))
+    logger::log_info(paste0("[MATCHING] - ", output_file, " saved successfully"))
   }
 
   return(D3_ELIGIBILITY)

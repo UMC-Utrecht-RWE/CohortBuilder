@@ -29,12 +29,12 @@ get_matching_variables <- function(eligible_pop, matching_vars = c(
                                      "SV_SEX", "SV_REGION", "SV_HIST_COVID_VACC", "SV_BRAND_COVID_VACC",
                                      "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED", "CDC_RISK", "SV_SES_STATUS", "bivalent_type_received"
                                    )) {
-  logr::log_print(c("[MATCHING] - Retrieving matching variables"))
+  logger::log_info(c("[MATCHING] - Retrieving matching variables"))
 
   # Check which variables are missing from the input data
   missing_vars <- setdiff(matching_vars, colnames(eligible_pop))
   if (length(missing_vars) > 0) {
-    logr::log_print(warning(paste0(
+    logger::log_info(warning(paste0(
       "The following variables are missing from the input data and will not be used for matching: ",
       paste(missing_vars, collapse = ", ")
     )))
@@ -44,9 +44,9 @@ get_matching_variables <- function(eligible_pop, matching_vars = c(
   matching_vars <- intersect(matching_vars, colnames(eligible_pop))
 
   # Inform the user about the variables that will actually be used
-  logr::log_print(paste0("The following variables will be used for matching: ", paste(matching_vars, collapse = ", ")))
+  logger::log_info(paste0("The following variables will be used for matching: ", paste(matching_vars, collapse = ", ")))
 
-  logr::log_print(c("[MATCHING] - Matching variables retrieved successfully"))
+  logger::log_info(c("[MATCHING] - Matching variables retrieved successfully"))
 
   return(matching_vars)
 }

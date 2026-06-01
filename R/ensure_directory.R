@@ -8,7 +8,7 @@
 
   if (!dir.exists(path)) {
     dir.create(path, recursive = TRUE, showWarnings = FALSE)
-    logr::log_print(paste0("[MATCHING] - Created ", label, " directory: ", path))
+    logger::log_info(paste0("[MATCHING] - Created ", label, " directory: ", path))
   }
 
   invisible(path)

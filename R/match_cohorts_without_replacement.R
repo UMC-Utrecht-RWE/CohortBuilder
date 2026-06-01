@@ -125,20 +125,20 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
     matching_query <- getSQL(default_matching_query_path)
     msg <- paste0("`matching_query` not specified. Falling back to packaged default: ", default_matching_query_file, ".")
     message(msg)
-    logr::log_print(paste0("[MATCHING-NR] - ", msg))
+    logger::log_info(paste0("[MATCHING-NR] - ", msg))
   }
 
   # Configure number of CPU threads for DuckDB
   if (is.null(n_cores)) {
     n_cores <- parallel::detectCores() - 1
-    logr::log_print(paste0("The parameter `n_cores` was not specified. By default ", n_cores, " will be used in the SQL matching procedure."))
+    logger::log_info(paste0("The parameter `n_cores` was not specified. By default ", n_cores, " will be used in the SQL matching procedure."))
   }
 
   # Set DuckDB thread configuration
   DBI::dbExecute(matching_conn, paste0("PRAGMA threads=", n_cores, ";"))
 
   # Begin pool preparation for greedy matching
-  logr::log_print("[MATCHING-NR] - Preparing no-replacement matching pool")
+  logger::log_info("[MATCHING-NR] - Preparing no-replacement matching pool")
 
   # Transform matching population to internal format with integer date encoding
   pool_dt <- data.table::as.data.table(matching_pop_groupkey)[
@@ -160,7 +160,7 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
 
   # Handle edge case: no exposed spells available for matching
   if (nrow(pool_dt[group == "exposed"]) == 0L) {
-    logr::log_print("[MATCHING-NR] - No exposed spells in matching population")
+    logger::log_info("[MATCHING-NR] - No exposed spells in matching population")
     # Create empty output with correct structure but no rows
     empty <- data.table::as.data.table(profile_table)[0]
     empty[, (col_person_id) := character()]
@@ -205,14 +205,14 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
   # Begin greedy matching rounds: continue until no more pairs can be formed
   repeat {
     # Generate candidate exposed-control pairs for current pool of available people
-    logr::log_print(paste0("[MATCHING-NR] - Round ", round_id, ": computing greedy proposals"))
+    logger::log_info(paste0("[MATCHING-NR] - Round ", round_id, ": computing greedy proposals"))
 
     accepted_round <- DBI::dbGetQuery(matching_conn, matching_query_adjusted)
     accepted_round <- data.table::as.data.table(accepted_round)
 
     # Exit matching loop when no more candidate pairs are available
     if (nrow(accepted_round) == 0L) {
-      logr::log_print(paste0("[MATCHING-NR] - Round ", round_id, ": no further pairs found"))
+      logger::log_info(paste0("[MATCHING-NR] - Round ", round_id, ": no further pairs found"))
       break
     }
 
@@ -246,7 +246,7 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
 
     # Exit if all candidate pairs dissolved due to collisions
     if (nrow(accepted_round) == 0L) {
-      logr::log_print(paste0("[MATCHING-NR] - Round ", round_id, ": proposals dissolved by person-level tie-breaking"))
+      logger::log_info(paste0("[MATCHING-NR] - Round ", round_id, ": proposals dissolved by person-level tie-breaking"))
       break
     }
 
@@ -385,13 +385,13 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
   # Optionally save results to parquet file on disk
   if (isTRUE(save_output)) {
     output_file_path <- file.path(result_dir, paste0(result_file, ".parquet"))
-    logr::log_print(paste0("[MATCHING-NR] - Saving ", output_file_path, " to disk..."))
+    logger::log_info(paste0("[MATCHING-NR] - Saving ", output_file_path, " to disk..."))
     arrow::write_parquet(match_results_long, output_file_path)
-    logr::log_print(paste0("[MATCHING-NR] - ", output_file_path, " saved to disk successfully."))
+    logger::log_info(paste0("[MATCHING-NR] - ", output_file_path, " saved to disk successfully."))
   }
 
   # Log completion of matching procedure
-  logr::log_print("[MATCHING-NR] - END")
+  logger::log_info("[MATCHING-NR] - END")
 
   # Return results to environment if not saving to disk
   if (!isTRUE(save_output)) {

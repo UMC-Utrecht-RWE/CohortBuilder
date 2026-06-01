@@ -27,7 +27,7 @@
 #'
 #' @export
 get_profile_table <- function(eligible_pop = NULL, matching_vars = NULL, save_output = FALSE, output_dir = NULL, output_file = "D3_LOOKUP_TABLE") {
-  logr::log_print("[MATCHING] - Creating lookup table")
+  logger::log_info("[MATCHING] - Creating lookup table")
 
   # Convert to data.table
   eligible_pop_dt <- data.table::as.data.table(eligible_pop)
@@ -40,18 +40,16 @@ get_profile_table <- function(eligible_pop = NULL, matching_vars = NULL, save_ou
     , groupkey := .I # Assign a unique integer identifier
   ]
 
-  logr::log_print("[MATCHING] - Lookup table created successfully")
+  logger::log_info("[MATCHING] - Lookup table created successfully")
 
   # Save lookup table to disk if required
   if (save_output) {
     if (is.null(output_dir)) stop("Output directory must be specified when save_output = TRUE")
     output_path <- file.path(output_dir, paste0(output_file, ".parquet"))
-    logr::log_print(paste0("[MATCHING] - Saving lookup table to ", output_path))
+    logger::log_info(paste0("[MATCHING] - Saving lookup table to ", output_path))
     arrow::write_parquet(profile_table, output_path)
-    logr::log_print("[MATCHING] - Lookup table saved successfully")
+    logger::log_info("[MATCHING] - Lookup table saved successfully")
   }
 
   return(profile_table)
 }
-
-
