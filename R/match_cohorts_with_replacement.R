@@ -79,7 +79,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     matching_query <- getSQL(default_matching_query_path)
     msg <- paste0("`matching_query` not specified. Falling back to packaged default: ", default_matching_query_file, ".")
     message(msg)
-    logr::log_print(paste0("[MATCHING] - ", msg))
+    logger::log_info(paste0("[MATCHING] - ", msg))
   }
 
   if (is_empty_query(target_table_query)) {
@@ -93,13 +93,13 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     target_table_query <- getSQL(default_target_table_query_path)
     msg <- paste0("`target_table_query` not specified. Falling back to packaged default: ", default_target_table_query_file, ".")
     message(msg)
-    logr::log_print(paste0("[MATCHING] - ", msg))
+    logger::log_info(paste0("[MATCHING] - ", msg))
   }
 
   # Configure DuckDB connection and thread count for SQL execution
   if (is.null(n_cores)) {
     n_cores <- parallel::detectCores() - 1
-    logr::log_print(paste0("The parameter `n_cores` was not specified. By default ", n_cores, " will be used in the SQL matching procedure."))
+    logger::log_info(paste0("The parameter `n_cores` was not specified. By default ", n_cores, " will be used in the SQL matching procedure."))
   }
 
   # Set DuckDB thread configuration
@@ -116,7 +116,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
 
     # Force single iteration if bootstrap is disabled
     if (n_bootstraps != 1) {
-      logr::log_print(paste0("The parameter `n_bootstraps` was overruled to 1 since no bootstrap will be done (`with_bootstrap` = FALSE)"))
+      logger::log_info(paste0("The parameter `n_bootstraps` was overruled to 1 since no bootstrap will be done (`with_bootstrap` = FALSE)"))
     }
     n_bootstraps <- 1
   }
@@ -131,7 +131,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     }
 
     # Log current bootstrap iteration progress
-    logr::log_print(paste0("Doing iteration ", bootstrap, " of ", n_bootstraps, ".... \n"))
+    logger::log_info(paste0("Doing iteration ", bootstrap, " of ", n_bootstraps, ".... \n"))
 
     # Conditional resampling with replacement if bootstrapping is enabled
     if (with_bootstrap) {
@@ -250,10 +250,10 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
   }
 
   # Signal end of bootstrap iterations
-  logr::log_print(c("[MATCHING] - END"))
+  logger::log_info(c("[MATCHING] - END"))
 
   # Read all matching results from DuckDB back into R for post-processing
-  logr::log_print("[MATCHING] - Reading matching dataset back into R")
+  logger::log_info("[MATCHING] - Reading matching dataset back into R")
 
   match_results <- DBI::dbReadTable(matching_conn, "match_result")
   data.table::setDT(match_results)
@@ -363,21 +363,21 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
   out_cols <- out_cols[out_cols %in% colnames(match_results_rebuilt_long)]
   match_results_rebuilt_long <- match_results_rebuilt_long[, ..out_cols]
 
-  logr::log_print("[MATCHING] - Done reading matching dataset back into R")
+  logger::log_info("[MATCHING] - Done reading matching dataset back into R")
 
   # Optionally save results to parquet file on disk
   if (save_output) {
     output_file_path <- if (!with_bootstrap) {
       file.path(result_dir, paste0(result_file, ".parquet"))
     }
-    logr::log_print(paste0("[MATCHING] - Saving ", output_file_path, " to disk..."))
+    logger::log_info(paste0("[MATCHING] - Saving ", output_file_path, " to disk..."))
     arrow::write_parquet(match_results_rebuilt_long, output_file_path)
-    logr::log_print(paste0("[MATCHING] - ", output_file_path, " saved to disk successfully."))
+    logger::log_info(paste0("[MATCHING] - ", output_file_path, " saved to disk successfully."))
   }
 
   # Return results if not bootstrapping and not saving to disk
   if (!with_bootstrap && !save_output) {
-    logr::log_print("[MATCHING] `save_output` set to FALSE, returning matching results")
+    logger::log_info("[MATCHING] `save_output` set to FALSE, returning matching results")
     class(match_results_rebuilt_long) <- unique(c("matching_study_cohort", class(match_results_rebuilt_long)))
     return(match_results_rebuilt_long)
   }

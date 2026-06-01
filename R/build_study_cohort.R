@@ -131,8 +131,7 @@ build_study_cohort <- function(eligible_pop = NULL,
   #### Set up the matching environment ####
   #########################################
 
-  logr::log_open(logdir = "logs", file_name = log_name)
-  logr::log_print(c("[MATCHING] - Setting up matching environment"))
+  logger::log_info(c("[MATCHING] - Setting up matching environment"))
 
   .ensure_directory(output_pars$dir_output, "output")
   .ensure_directory(intermediate_output_pars$dir_intermediate_outputs, "intermediate output")
@@ -159,7 +158,7 @@ build_study_cohort <- function(eligible_pop = NULL,
     }
 
     matching_query <- getSQL(default_matching_query_path)
-    logr::log_print(paste0("[MATCHING] - Loaded default matching SQL from ", default_matching_query_file, "."))
+    logger::log_info(paste0("[MATCHING] - Loaded default matching SQL from ", default_matching_query_file, "."))
   }
 
   if (matching_mode == "with_replacement" && is_empty_query(target_table_query)) {
@@ -171,7 +170,7 @@ build_study_cohort <- function(eligible_pop = NULL,
     }
 
     target_table_query <- getSQL(default_target_table_query_path)
-    logr::log_print(paste0("[MATCHING] - Loaded default target-table SQL from ", default_target_table_query_file, "."))
+    logger::log_info(paste0("[MATCHING] - Loaded default target-table SQL from ", default_target_table_query_file, "."))
   }
 
   set_matching_environment(
@@ -211,11 +210,11 @@ build_study_cohort <- function(eligible_pop = NULL,
       arrow::write_parquet(matched_population, output_file_path)
     }
 
-    logr::log_print(stop(c("No eligible exposed (`eligible_exposed = TRUE`) available in the data. Matching will not take place.")))
+    logger::log_info(stop(c("No eligible exposed (`eligible_exposed = TRUE`) available in the data. Matching will not take place.")))
   }
 
   if (all(eligible_pop[[input_column_names$col_eligible_control]] == FALSE)) {
-    logr::log_print(warning(c("No eligible controls (`eligible_control = TRUE`) available in the data. Eligible exposed will not be matched.")))
+    logger::log_info(warning(c("No eligible controls (`eligible_control = TRUE`) available in the data. Eligible exposed will not be matched.")))
   }
 
   # Drop non-eligible spells
@@ -303,11 +302,11 @@ build_study_cohort <- function(eligible_pop = NULL,
   rm(matching_conn)
   invisible(gc())
 
-  logr::log_print(paste0("[MATCHING] - Disconnected from the database (", dir_matching_db, ")."))
+  logger::log_info(paste0("[MATCHING] - Disconnected from the database (", dir_matching_db, ")."))
 
   if (file.exists(dir_matching_db)) {
     file.remove(dir_matching_db)
-    logr::log_print("[MATCHING] - Removed existing database.")
+    logger::log_info("[MATCHING] - Removed existing database.")
   }
 
   # Write cohort to disk (non-bootstrap runs only)
@@ -316,9 +315,9 @@ build_study_cohort <- function(eligible_pop = NULL,
       output_pars$dir_output,
       paste0(output_pars$output_file_name, ".parquet")
     )
-    logr::log_print(paste0("[MATCHING] - Saving ", output_file_path, " to disk..."))
+    logger::log_info(paste0("[MATCHING] - Saving ", output_file_path, " to disk..."))
     arrow::write_parquet(D4_MSC, output_file_path)
-    logr::log_print(paste0("[MATCHING] - ", output_file_path, " saved to disk successfully."))
+    logger::log_info(paste0("[MATCHING] - ", output_file_path, " saved to disk successfully."))
   }
 
   # Log cohort summary (non-bootstrap runs only)
@@ -326,12 +325,10 @@ build_study_cohort <- function(eligible_pop = NULL,
     tryCatch(
       .log_matching_summary(D4_MSC),
       error = function(e) {
-        logr::log_print(paste0("[MATCHING] - Could not log cohort summary: ", conditionMessage(e)))
+        logger::log_info(paste0("[MATCHING] - Could not log cohort summary: ", conditionMessage(e)))
       }
     )
   }
-
-  logr::log_close(footer = TRUE)
 
   if (!bootstrap_pars$with_bootstrap) {
     return(D4_MSC)

@@ -34,7 +34,7 @@ set_matching_environment <- function(eligible_pop = NULL,
                                      n_bootstraps = NULL,
                                      dir_bootstrap = NULL,
                                      dir_matching_db = NULL) {
-  logr::log_print(c("[MATCHING] - Setting up matching environment"))
+  logger::log_info(c("[MATCHING] - Setting up matching environment"))
 
   # Check if the eligible_pop file exists
   if (is.null(eligible_pop)) {
@@ -55,7 +55,7 @@ set_matching_environment <- function(eligible_pop = NULL,
     # Only if we need bootstrapping
     if (!dir.exists(dir_bootstrap)) {
       dir.create(dir_bootstrap)
-      logr::log_print("Created the bootstrap output folder")
+      logger::log_info("Created the bootstrap output folder")
     } else {
       # Get the list of files matching the pattern "*_bootstrap_*.parquet" in the directory
       bootstrap_files <- list.files(dir_bootstrap, pattern = ".*_bootstrap_[0-9]+\\.parquet$", full.names = TRUE)
@@ -63,9 +63,9 @@ set_matching_environment <- function(eligible_pop = NULL,
       # Check if there are any matching files and delete them if they exist
       if (length(bootstrap_files) > 0) {
         file.remove(bootstrap_files)
-        logr::log_print(paste0("Deleted the following files: ", paste(basename(bootstrap_files), collapse = ", ")))
+        logger::log_info(paste0("Deleted the following files: ", paste(basename(bootstrap_files), collapse = ", ")))
       } else {
-        logr::log_print("No files matching '.*_bootstrap_[0-9]+\\.parquet$' found in the directory.")
+        logger::log_info("No files matching '.*_bootstrap_[0-9]+\\.parquet$' found in the directory.")
       }
     }
   }
@@ -73,10 +73,8 @@ set_matching_environment <- function(eligible_pop = NULL,
   # Remove the database if it exists
   if (file.exists(dir_matching_db)) {
     file.remove(dir_matching_db)
-    logr::log_print("Removed existing database.")
+    logger::log_info("Removed existing database.")
   }
 
-  logr::log_print(c("[MATCHING] - Matching environment set up successfully"))
+  logger::log_info(c("[MATCHING] - Matching environment set up successfully"))
 }
-
-

@@ -1,9 +1,9 @@
 # S3 methods for matching study cohort output ----------------------------
 
-#' Internal: Log cohort summary via logr
+#' Internal: Log cohort summary via logger
 #'
 #' Writes structured summary statistics for a matched study cohort directly
-#' to the active logr log, using `hide_notes = TRUE` on all intermediate
+#' to the active logger log, using `hide_notes = TRUE` on all intermediate
 #' lines so timestamps do not appear between every row.
 #'
 #' @param object A data.table with class "matching_study_cohort".
@@ -13,29 +13,40 @@
     object <- data.table::as.data.table(object)
   }
 
+  .log_table_lines <- function(x) {
+    out <- capture.output(print(x, row.names = FALSE))
+    if (length(out) == 0L) {
+      return(invisible(NULL))
+    }
+    for (line in out) {
+      logger::log_info(line)
+    }
+    invisible(NULL)
+  }
+
   required_cols <- c("group", "person_id")
   if (!all(required_cols %in% names(object))) {
-    logr::log_print("[MATCHING] - Skipping cohort summary: 'group' or 'person_id' column not found.")
+    logger::log_info("[MATCHING] - Skipping cohort summary: 'group' or 'person_id' column not found.")
     return(invisible(NULL))
   }
 
-  logr::log_print("=== Matched Study Cohort Summary ===", hide_notes = TRUE)
-  logr::log_print("", hide_notes = TRUE)
+  logger::log_info("=== Matched Study Cohort Summary ===", hide_notes = TRUE)
+  logger::log_info("", hide_notes = TRUE)
 
   # --- Episodes by group ---
-  logr::log_print("Episodes by Matching Status:", hide_notes = TRUE)
-  logr::log_print("---------------------------------", hide_notes = TRUE)
+  logger::log_info("Episodes by Matching Status:", hide_notes = TRUE)
+  logger::log_info("---------------------------------", hide_notes = TRUE)
   episodes_by_group <- object[, .(N = .N), by = .(group)]
   episodes_by_group[, pct := round(100 * N / sum(N), 2L)]
   episodes_by_group <- episodes_by_group[order(-N)]
-  logr::log_print(episodes_by_group, hide_notes = TRUE)
-  logr::log_print("", hide_notes = TRUE)
-  logr::log_print(paste0("Total Episodes: ", nrow(object)), hide_notes = TRUE)
+  .log_table_lines(episodes_by_group)
+  logger::log_info("", hide_notes = TRUE)
+  logger::log_info(paste0("Total Episodes: ", nrow(object)), hide_notes = TRUE)
 
   # --- Control usage distribution ---
-  logr::log_print("", hide_notes = TRUE)
-  logr::log_print("Distribution of Control Usage (matched groups):", hide_notes = TRUE)
-  logr::log_print("---------------------------------", hide_notes = TRUE)
+  logger::log_info("", hide_notes = TRUE)
+  logger::log_info("Distribution of Control Usage (matched groups):", hide_notes = TRUE)
+  logger::log_info("---------------------------------", hide_notes = TRUE)
   controls <- object[group == "CONTROL"]
 
   if (nrow(controls) > 0L) {
@@ -49,14 +60,14 @@
       by = .(times_used = N_used)
     ][order(times_used)]
 
-    logr::log_print(control_usage_dist, hide_notes = TRUE)
-    logr::log_print("", hide_notes = TRUE)
-    logr::log_print(paste0("Total Unique Control Person IDs: ", nrow(control_usage)), hide_notes = TRUE)
-    logr::log_print(paste0("Total Control Episodes: ", nrow(controls)), hide_notes = TRUE)
-    logr::log_print(paste0("Average Uses per Control: ", round(mean(control_usage$N_used), 2L)), hide_notes = TRUE)
-    logr::log_print(paste0("Max Uses for Single Control: ", max(control_usage$N_used)))
+    .log_table_lines(control_usage_dist)
+    logger::log_info("", hide_notes = TRUE)
+    logger::log_info(paste0("Total Unique Control Person IDs: ", nrow(control_usage)), hide_notes = TRUE)
+    logger::log_info(paste0("Total Control Episodes: ", nrow(controls)), hide_notes = TRUE)
+    logger::log_info(paste0("Average Uses per Control: ", round(mean(control_usage$N_used), 2L)), hide_notes = TRUE)
+    logger::log_info(paste0("Max Uses for Single Control: ", max(control_usage$N_used)))
   } else {
-    logr::log_print("No matched controls found.")
+    logger::log_info("No matched controls found.")
   }
 }
 

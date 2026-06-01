@@ -48,7 +48,7 @@ get_matching_population <- function(eligible_pop = NULL,
                                     col_matching_status_end = "matching_status_end",
                                     col_age_iterator = "year_of_birth") {
   # Log start of the operation
-  logr::log_print(paste0("[MATCHING] - Creating ", output_file))
+  logger::log_info(paste0("[MATCHING] - Creating ", output_file))
 
   # Convert inputs to data.tables if not already
   eligible_pop <- data.table::as.data.table(eligible_pop)
@@ -81,17 +81,15 @@ get_matching_population <- function(eligible_pop = NULL,
   ), with = FALSE]
 
   # Log successful creation
-  logr::log_print(paste0("[MATCHING] - ", output_file, " created successfully"))
+  logger::log_info(paste0("[MATCHING] - ", output_file, " created successfully"))
 
   # Save output if required
   if (isTRUE(save_output)) {
-    logr::log_print(paste0("[MATCHING] - Saving ", output_file, " to ", output_dir, "/", output_file, ".parquet"))
+    logger::log_info(paste0("[MATCHING] - Saving ", output_file, " to ", output_dir, "/", output_file, ".parquet"))
     arrow::write_parquet(matching_pop_groupkey, file.path(output_dir, paste0(output_file, ".parquet")))
-    logr::log_print(paste0("[MATCHING] - ", output_file, " saved successfully"))
+    logger::log_info(paste0("[MATCHING] - ", output_file, " saved successfully"))
   }
 
   # Return the result
   return(matching_pop_groupkey)
 }
-
-
