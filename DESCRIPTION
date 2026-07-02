@@ -1,6 +1,6 @@
 Package: CohortBuilder
 Title: Bootstrap SQL-Based Matched Study Cohort Builder
-Version: 0.1.0
+Version: 0.1.1
 Authors@R:
     c(
     person("Sebastian", "Mildiner Moraga",
@@ -17,7 +17,6 @@ Description: Constructs matched study cohorts by matching eligible exposed
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
 Imports:
     arrow,
     data.table,
@@ -32,3 +31,4 @@ Suggests:
     testthat (>= 3.0.0)
 VignetteBuilder: knitr
 Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0

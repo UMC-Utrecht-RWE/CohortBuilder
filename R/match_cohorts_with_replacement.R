@@ -4,7 +4,9 @@
 #'
 #' This function performs matching between exposed and control populations within a study cohort,
 #' with optional bootstrapping to account for variability in the results. Matching is performed
-#' using a provided SQL query, leveraging DuckDB for efficient data handling.
+#' using a provided SQL query, leveraging DuckDB for efficient data handling. Matching is done by batches defined by unique values of col_age_iterator (by default year of birth) of the exposed which is assumed numeric.
+#' Candidate control matches are selected based on the profile table, and having col_age_iterator value between col_age_iterator - col_age_offset and col_age_iterator + col_age_offset.
+#' If no range matching on col_age_iterator is required, set col_age_offset to NULL. In that case, all candidate controls are selected
 #'
 #' @param matching_pop_groupkey A data frame containing the eligible population to be matched, with a grouping key.
 #' @param matching_vars A character vector of variable names to use in the matching process.
@@ -26,7 +28,8 @@
 #' @param col_T0 A string specifying the column name for the treatment initiation time. Defaults to `"T0"`.
 #' @param col_matching_status_start A string specifying the column name for the start date of the matching status. Defaults to `"matching_status_start"`.
 #' @param col_matching_status_end A string specifying the column name for the end date of the matching status. Defaults to `"matching_status_end"`.
-#' @param col_age_iterator A string specifying the column name for the year of birth or age iterator. Defaults to `"year_of_birth"`.
+#' @param col_age_iterator A string specifying the column name for the (numeric) year of birth or age iterator. Defaults to `"year_of_birth"`.
+#' @param col_age_offset A numeric value specifying the range of values of col_age_iterator with which to select candidate controls. Defaults to 1. If no range-matching on this variable required, user should set to NULL.
 #'
 #' @return If `with_bootstrap` is `FALSE` and `save_output` is `FALSE`, the function returns a data.table of the matched population.
 #' If `save_output` is `TRUE`, the results are saved to the specified file.
@@ -66,7 +69,21 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
                                            col_T0 = "T0",
                                            col_matching_status_start = "matching_status_start",
                                            col_matching_status_end = "matching_status_end",
-                                           col_age_iterator = "year_of_birth") {
+                                           col_age_iterator = "year_of_birth",
+                                           col_age_offset = 1) {
+
+  if(is.numeric(col_age_offset)){
+    msg <- paste("Matching based on profile and", col_age_iterator, "exposed between", col_age_iterator, "+/-", col_age_offset)
+    logger::log_info(paste0("[MATCHING] - ", msg))
+  }
+  if(is.null(col_age_offset)){
+    msg <- paste("Matching based on profile only. Iterating batches by", col_age_iterator, "exposed")
+    logger::log_info(paste0("[MATCHING] - ", msg))
+  }
+  if(!(is.null(col_age_offset) | is.numeric(col_age_offset))){
+    stop("col_age_offset must be 1 or NULL")
+  }
+
   # Load packaged defaults when SQL queries are not provided
   if (is_empty_query(matching_query)) {
     default_matching_query_file <- "matching_query_with_replacement.sql"
@@ -226,11 +243,19 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
         matching_query
       )
       # Adjust age tolerance window for year-of-birth matching
+      if(is.null(col_age_offset)){
+        matching_query_adjusted <- gsub(
+          "year_of_birth BETWEEN 1919 AND 1921",
+          paste0("year_of_birth BETWEEN ", min_year, " AND ", max_year),
+          matching_query_adjusted
+        )
+      }else{
       matching_query_adjusted <- gsub(
         "year_of_birth BETWEEN 1919 AND 1921",
-        paste0("year_of_birth BETWEEN ", year - 1, " AND ", year + 1),
+        paste0("year_of_birth BETWEEN ", year - col_age_offset, " AND ", year + col_age_offset),
         matching_query_adjusted
       )
+      }
 
       # Modify join type if bootstrap enabled: ensure person used matches once only
       if (with_bootstrap) {
