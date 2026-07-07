@@ -51,6 +51,7 @@
 #'     \item{`col_matching_status_start`}{Column name for the start date of matching eligibility. Default is `"matching_status_start"`.}
 #'     \item{`col_matching_status_end`}{Column name for the end date of matching eligibility. Default is `"matching_status_end"`.}
 #'     \item{`col_age_iterator`}{Column name for the age iterator. Default is `"year_of_birth"`.}
+#'     \item{`col_age_offset`}{A numeric value specifying the range of values of col_age_iterator with which to select candidate controls. Defaults to 1. If no range-matching on this variable required, user should set to NULL.}
 #'   }
 #' @param output_column_names A list specifying the column names for the output data:
 #'   \describe{
@@ -118,7 +119,8 @@ build_study_cohort <- function(eligible_pop = NULL,
                                  col_eligible_control = "eligible_control",
                                  col_matching_status_start = "matching_status_start",
                                  col_matching_status_end = "matching_status_end",
-                                 col_age_iterator = "year_of_birth"
+                                 col_age_iterator = "year_of_birth",
+                                 col_age_offset = 1
                                ),
                                output_column_names = list(
                                  col_person_id = "person_id",
@@ -274,6 +276,7 @@ build_study_cohort <- function(eligible_pop = NULL,
       col_matching_status_start = input_column_names$col_matching_status_start,
       col_matching_status_end = input_column_names$col_matching_status_end,
       col_age_iterator = input_column_names$col_age_iterator,
+      col_age_offset = input_column_names$col_age_offset,
       col_match_id = output_column_names$col_match_id,
       col_treatment_group = output_column_names$col_treatment_group,
       col_T0 = output_column_names$col_T0
