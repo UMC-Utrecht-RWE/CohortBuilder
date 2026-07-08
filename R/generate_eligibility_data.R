@@ -60,7 +60,7 @@ generate_eligibility_data <- function(n = 10000, start_seed = 42, save_output, o
     SV_BRAND_COVID_VACC = NA_character_,
     SV_PRIOR_COVID_DG = sample(c(0, 1), n, replace = TRUE, prob = c(0.8, 0.2)),
     SV_IMMUNOCOMPROMISED = sample(c(0, 1), n, replace = TRUE, prob = c(0.9, 0.1)),
-    SV_PREG_STATUS = sample(c(0, 1, 2), n, replace = TRUE, prob = c(0.95, 0.04, 0.01)),
+    SV_PREG_STATUS = sample(c(FALSE, TRUE), n, replace = TRUE, prob = c(0.95, 0.05)),
     SV_SES_STATUS = sample(c(NA, 1, 2, 3), n, replace = TRUE, prob = c(0.05, 0.3, 0.4, 0.25)),
     COMP_COMORBIDITIES = sample(c(TRUE, FALSE), n, replace = TRUE, prob = c(0.3, 0.7)),
     dead = sample(c(TRUE, FALSE), n, replace = TRUE, prob = c(0.01, 0.99)),
