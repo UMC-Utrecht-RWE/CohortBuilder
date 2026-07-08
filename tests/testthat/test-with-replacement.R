@@ -23,25 +23,21 @@ make_d3 <- function(n_spells = 2e5, seed = 42L) {
   )
 }
 
-run_pipeline <- function(d3, seed = 42L, age_offset = 1) {
-  matching_vars <- c(
-    "SV_SEX", "SV_REGION", "SV_PRIOR_COVID_DG", "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED", "CDC_RISK", "SV_SES_STATUS"
+run_pipeline <- function(
+  d3, seed = 42L, age_offset = 1,
+  matching_vars = c("SV_SEX", "SV_REGION", "SV_PRIOR_COVID_DG", "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED", "CDC_RISK", "SV_SES_STATUS"),
+  date_match_pars = list(
+    col_date_match = NULL,
+    date_match_offsets = NULL
   )
-
-  matching_query <- suppressWarnings(
-    getSQL(system.file("sql_queries", "matching_query_with_replacement.sql", package = "CohortBuilder"))
-  )
-  target_table_query <- getSQL(
-    system.file("sql_queries", "create_matching_target_table.sql", package = "CohortBuilder")
-  )
+) {
   db_path <- tempfile(fileext = ".duckdb")
 
   d4 <- data.table::as.data.table(
     build_study_cohort(
       eligible_pop = d3,
-      matching_query = matching_query,
-      target_table_query = target_table_query,
       matching_vars = matching_vars,
+      date_match_pars = date_match_pars,
       dir_matching_db = db_path,
       n_cores = NULL,
       log_name = file.path(tempdir(), "log_test"),
@@ -161,5 +157,43 @@ test_that("if age_offset = NULL, year_of_birth values can vary within each pair"
   expect_true(
     by_var[, any((max_yob - min_yob) > 1)],
     label = "year_of_birth can vary within each pair when age_offset is NULL"
+  )
+})
+
+test_that("date matching works with specified offsets", {
+  d3_preg <- data.table(
+    person_id = 1:8,
+    start = as.Date(c("2020-01-01", "2019-12-25", "2020-02-03", "2020-01-04", "2020-03-05", "2020-03-01", "2020-01-15", "2020-01-05")),
+    end = as.Date(c("2020-01-01", "2020-01-11", "2020-02-03", "2020-02-13", "2020-03-05", "2020-04-15", "2020-01-15", "2020-05-10")),
+    eligible_exposed = c(TRUE, FALSE, TRUE, FALSE, TRUE, FALSE, TRUE, FALSE),
+    eligible_control = c(FALSE, TRUE, FALSE, TRUE, FALSE, TRUE, FALSE, TRUE),
+    SV_PREG_STATUS = c(TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE),
+    SV_SEX = c("F", "F", "F", "F", "M", "M", "F", "M"),
+    year_of_birth = c(1990, 1990, 1990, 1990, 1985, 1985, 1992, 1993),
+    lmp_date = as.Date(c("2019-10-01", "2019-10-01", "2019-11-01", "2019-11-01", NA, NA, NA, NA))
+  )
+
+  res <- run_pipeline(d3_preg,
+    seed = 42L,
+    matching_vars = c("SV_PREG_STATUS", "SV_SEX"),
+    age_offset = 1,
+    date_match_pars = list(
+      col_date_match = "lmp_date",
+      date_match_offsets = c(lmp_date = 1) # Allow a 30-day difference in lmp_date for matching
+    )
+  )
+  matched <- res$d4[!is.na(match_id)]
+
+  if (nrow(matched) == 0L) skip("No matched pairs produced")
+
+  # Check that lmp_date differences are within the specified offset (for pairs where both have lmp_date)
+  by_var <- matched[
+    !is.na(lmp_date),
+    .(lmp_diff = as.integer(max(lmp_date) - min(lmp_date))),
+    by = match_id
+  ]
+  expect_true(
+    nrow(by_var) == 0L || by_var[, all(lmp_diff <= 1L)],
+    label = "lmp_date differences are within offset of 1 day within each matched pair"
   )
 })

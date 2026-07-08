@@ -18,6 +18,9 @@
 #' @param col_matching_status_start A string specifying the column name for the start date of the matching status. Defaults to `"matching_status_start"`.
 #' @param col_matching_status_end A string specifying the column name for the end date of the matching status. Defaults to `"matching_status_end"`.
 #' @param col_age_iterator A string specifying the column name for the year of birth or age iterator. Defaults to `"year_of_birth"`.
+#' @param col_date_match A character vector of date column names for range matching. Defaults to `NULL`.
+#' @param date_match_offsets A named integer vector specifying the offset (in days) for each date column in `col_date_match`.
+#'   Names must match the column names. Defaults to `NULL`.
 #'
 #' @return A data.table of the matching population, with individuals grouped into "exposed" and "control" groups.
 #' If `save_output` is `TRUE`, the function also saves the resulting data frame to the specified directory.
@@ -46,7 +49,9 @@ get_matching_population <- function(eligible_pop = NULL,
                                     col_eligible_control = "eligible_control",
                                     col_matching_status_start = "matching_status_start",
                                     col_matching_status_end = "matching_status_end",
-                                    col_age_iterator = "year_of_birth") {
+                                    col_age_iterator = "year_of_birth",
+                                    col_date_match = NULL,
+                                    date_match_offsets = NULL) {
   # Log start of the operation
   logger::log_info(paste0("[MATCHING] - Creating ", output_file))
 
@@ -54,15 +59,21 @@ get_matching_population <- function(eligible_pop = NULL,
   eligible_pop <- data.table::as.data.table(eligible_pop)
   profile_table <- data.table::as.data.table(profile_table)
 
-  # Perform inner join
+  # Compute profile vars: exclude date match columns (they are not in the profile table)
+  profile_vars <- setdiff(matching_vars, col_date_match)
+
+  # Select columns from eligible_pop, including date match columns explicitly
+  eligible_cols <- unique(c(
+    col_person_id, col_age_iterator, col_matching_status_start,
+    col_matching_status_end, profile_vars, col_date_match,
+    col_eligible_exposed, col_eligible_control
+  ))
+
+  # Perform inner join on profile vars only (date match columns excluded from join key)
   matching_pop_groupkey <- merge(
-    x = eligible_pop[, c(
-      col_person_id, col_age_iterator, col_matching_status_start,
-      col_matching_status_end, matching_vars,
-      col_eligible_exposed, col_eligible_control
-    ), with = FALSE], # Prevent `with = TRUE` to handle column names dynamically
+    x = eligible_pop[, eligible_cols, with = FALSE],
     y = profile_table,
-    by = matching_vars,
+    by = profile_vars,
     all = FALSE
   )
 
@@ -74,11 +85,36 @@ get_matching_population <- function(eligible_pop = NULL,
     )
   )]
 
+  # Validate and convert date match columns to INT if provided
+  if (!is.null(col_date_match)) {
+    # Validate that all date columns exist
+    missing_cols <- setdiff(col_date_match, names(matching_pop_groupkey))
+    if (length(missing_cols) > 0) {
+      logger::log_error(paste0("[MATCHING] - The following date match columns are not found in the data: ", paste(missing_cols, collapse = ", ")))
+      stop("Date match columns not found: ", paste(missing_cols, collapse = ", "))
+    }
+
+    # Convert each date column to INT (days since 1970-01-01)
+    origin_date <- as.Date("1970-01-01")
+    for (date_col in col_date_match) {
+      date_col_int <- paste0(date_col, "_int")
+      matching_pop_groupkey[, (date_col_int) := as.integer(as.Date(get(date_col)) - origin_date)]
+    }
+  }
+
   # Reorder and select columns dynamically (including inherited groupkey from profile_table)
-  matching_pop_groupkey <- matching_pop_groupkey[, c(
+  cols_to_keep <- c(
     col_person_id, col_matching_status_start, col_matching_status_end,
     col_age_iterator, "group", "groupkey"
-  ), with = FALSE]
+  )
+
+  # Add both original and INT date columns if date matching is specified
+  if (!is.null(col_date_match)) {
+    date_int_cols <- paste0(col_date_match, "_int")
+    cols_to_keep <- c(cols_to_keep, col_date_match, date_int_cols)
+  }
+
+  matching_pop_groupkey <- matching_pop_groupkey[, cols_to_keep, with = FALSE]
 
   # Log successful creation
   logger::log_info(paste0("[MATCHING] - ", output_file, " created successfully"))

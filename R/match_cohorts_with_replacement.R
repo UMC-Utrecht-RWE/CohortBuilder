@@ -30,6 +30,9 @@
 #' @param col_matching_status_end A string specifying the column name for the end date of the matching status. Defaults to `"matching_status_end"`.
 #' @param col_age_iterator A string specifying the column name for the (numeric) year of birth or age iterator. Defaults to `"year_of_birth"`.
 #' @param age_offset A numeric value specifying the range of values of col_age_iterator with which to select candidate controls. Defaults to 1. If no range-matching on this variable required, user should set to NULL.
+#' @param col_date_match A character vector of date column names for range matching. Defaults to `NULL`.
+#' @param date_match_offsets A named integer vector specifying the offset (in days) for each date column in `col_date_match`.
+#'   Names must match the column names. Defaults to `NULL`.
 #'
 #' @return If `with_bootstrap` is `FALSE` and `save_output` is `FALSE`, the function returns a data.table of the matched population.
 #' If `save_output` is `TRUE`, the results are saved to the specified file.
@@ -70,7 +73,9 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
                                            col_matching_status_start = "matching_status_start",
                                            col_matching_status_end = "matching_status_end",
                                            col_age_iterator = "year_of_birth",
-                                           age_offset = 1) {
+                                           age_offset = 1,
+                                           col_date_match = NULL,
+                                           date_match_offsets = NULL) {
   if (is.numeric(age_offset)) {
     msg <- paste("Matching based on profile and", col_age_iterator, "exposed between", col_age_iterator, "+/-", age_offset)
     logger::log_info(paste0("[MATCHING] - ", msg))
@@ -79,8 +84,30 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     msg <- paste("Matching based on profile only. Iterating batches by", col_age_iterator, "exposed")
     logger::log_info(paste0("[MATCHING] - ", msg))
   }
-  if (!(is.null(age_offset) | is.numeric(age_offset))) {
+  if (!(is.null(age_offset) || is.numeric(age_offset))) {
     stop("age_offset must be 1 or NULL")
+  }
+
+  # Validate and prepare date matching conditions
+  if (!is.null(col_date_match)) {
+    # Validate that all date INT columns exist in matching_pop_groupkey (added by get_matching_population)
+    expected_int_cols <- paste0(col_date_match, "_int")
+    missing_cols <- setdiff(expected_int_cols, names(matching_pop_groupkey))
+    if (length(missing_cols) > 0) {
+      logger::log_error(paste0("[MATCHING] - The following date match columns are not found in the data: ", paste(gsub("_int$", "", missing_cols), collapse = ", ")))
+      stop("Date match columns not found: ", paste(gsub("_int$", "", missing_cols), collapse = ", "))
+    }
+
+    # Validate that date_match_offsets has names matching col_date_match
+    if (is.null(date_match_offsets)) {
+      logger::log_error("[MATCHING] - date_match_offsets must be provided when col_date_match is specified")
+      stop("date_match_offsets must be provided when col_date_match is specified")
+    }
+
+    if (!all(col_date_match %in% names(date_match_offsets))) {
+      logger::log_error(paste0("[MATCHING] - date_match_offsets must have names matching col_date_match. Expected: ", paste(col_date_match, collapse = ", ")))
+      stop("date_match_offsets must have names matching col_date_match")
+    }
   }
 
   # Load packaged defaults when SQL queries are not provided
@@ -117,6 +144,28 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     n_cores <- parallel::detectCores() - 1
     logger::log_info(paste0("The parameter `n_cores` was not specified. By default ", n_cores, " will be used in the SQL matching procedure."))
   }
+
+  # Build dynamic SQL date matching conditions
+  date_match_sql_conditions <- ""
+  if (!is.null(col_date_match)) {
+    date_conditions <- character()
+    for (i in seq_along(col_date_match)) {
+      date_col <- col_date_match[i]
+      date_col_int <- paste0(date_col, "_int")
+      offset <- date_match_offsets[[date_col]]
+      # Build condition: if exposed date is NULL skip check; otherwise control must be within offset
+      # NULL BETWEEN x AND y = NULL (false) in SQL, so we need IS NULL escape
+      condition <- paste0(
+        "AND (E.", date_col_int, " IS NULL OR U.", date_col_int,
+        " BETWEEN E.", date_col_int, " - ", offset,
+        " AND E.", date_col_int, " + ", offset, ")"
+      )
+      date_conditions <- c(date_conditions, condition)
+    }
+    date_match_sql_conditions <- paste(date_conditions, collapse = "\n            ")
+    logger::log_info(paste0("[MATCHING] - Date range matching enabled for: ", paste(col_date_match, collapse = ", ")))
+  }
+
 
   # Set DuckDB thread configuration
   DBI::dbExecute(matching_conn, paste0("PRAGMA threads=", n_cores, ";"))
@@ -187,31 +236,31 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     sampled_df[, year_of_birth := as.integer(get(col_age_iterator))]
     sampled_df[, groupkey := as.integer(groupkey)]
 
+    # Ensure date INT columns are integer type (already computed in get_matching_population)
+    if (!is.null(col_date_match)) {
+      for (date_col in col_date_match) {
+        date_col_int <- paste0(date_col, "_int")
+        sampled_df[, (date_col_int) := as.integer(get(date_col_int))]
+      }
+    }
+
     # Determine year-of-birth range for year-wise matching iterations
     min_year <- min(sampled_df$year_of_birth, na.rm = TRUE)
     max_year <- max(sampled_df$year_of_birth, na.rm = TRUE)
 
     # Extract exposed population and assign random values for stochastic matching
     cat(sprintf("\r%-50s", "Selecting the exposed population...."))
-    sampled_df_Exp <- sampled_df[
-      group == "exposed",
-      .(
-        person_id, person_id_int, groupkey, group, get(col_matching_status_start), get(col_matching_status_end),
-        year_of_birth, startdateINT, enddateINT
-      )
-    ]
+    exp_cols <- c("person_id", "person_id_int", "groupkey", "group", "startdateINT", "enddateINT", "year_of_birth")
+    if (!is.null(col_date_match)) exp_cols <- c(exp_cols, paste0(col_date_match, "_int"))
+    sampled_df_Exp <- sampled_df[group == "exposed", exp_cols, with = FALSE]
     sampled_df_Exp[, random := runif(.N, min = 0, max = 10)]
     sampled_df_Exp[, match_id := .I]
 
     # Extract control population and assign random values for stochastic matching
     cat(sprintf("\r%-50s", "Selecting the unexposed population...."))
-    sampled_df_Un <- sampled_df[
-      group == "control",
-      .(
-        person_id, groupkey, group, get(col_matching_status_start), get(col_matching_status_end),
-        year_of_birth, startdateINT, enddateINT
-      )
-    ]
+    un_cols <- c("person_id", "groupkey", "group", "startdateINT", "enddateINT", "year_of_birth")
+    if (!is.null(col_date_match)) un_cols <- c(un_cols, paste0(col_date_match, "_int"))
+    sampled_df_Un <- sampled_df[group == "control", un_cols, with = FALSE]
     sampled_df_Un[, random := runif(.N, min = 0, max = 10)]
 
     rm(sampled_df)
@@ -255,6 +304,14 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
           matching_query_adjusted
         )
       }
+
+      # Add date range matching conditions to the query
+      matching_query_adjusted <- gsub(
+        "-- {{DATE_MATCH_CONDITIONS}}",
+        date_match_sql_conditions,
+        matching_query_adjusted,
+        fixed = TRUE
+      )
 
       # Modify join type if bootstrap enabled: ensure person used matches once only
       if (with_bootstrap) {
@@ -377,15 +434,49 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
   age_idx <- match(match_results_rebuilt_long[[col_person_id]], age_lookup$person_id)
   match_results_rebuilt_long[, (col_age_iterator) := age_lookup$age_value[age_idx]]
 
+  # Retrieve original date columns for date matching if specified
+  if (!is.null(col_date_match)) {
+    pop_dt <- data.table::as.data.table(matching_pop_groupkey)
+    pid_col <- col_person_id
+
+    for (date_col in col_date_match) {
+      # Get one non-NA value per person; persons with all-NA get NA of the correct type
+      date_lookup <- unique(
+        pop_dt[!is.na(get(date_col)), c(pid_col, date_col), with = FALSE],
+        by = pid_col
+      )
+      date_idx <- match(
+        match_results_rebuilt_long[[col_person_id]],
+        date_lookup[[pid_col]]
+      )
+      match_results_rebuilt_long[, (date_col) := date_lookup[[date_col]][date_idx]]
+    }
+  }
+
   # Select and order final output columns
   out_cols <- c(
     col_person_id, col_match_id, "boot_id", col_T0, col_treatment_group,
     col_matching_status_start, col_matching_status_end, col_age_iterator,
     matching_vars
   )
+
+  # Add date match columns to output if specified
+  if (!is.null(col_date_match)) {
+    out_cols <- c(out_cols, col_date_match)
+  }
+
   out_cols <- unique(out_cols)
   out_cols <- out_cols[out_cols %in% colnames(match_results_rebuilt_long)]
   match_results_rebuilt_long <- match_results_rebuilt_long[, ..out_cols]
+
+  # Remove any INT date columns that may have been included
+  if (!is.null(col_date_match)) {
+    date_int_cols <- paste0(col_date_match, "_int")
+    date_int_cols_to_drop <- intersect(date_int_cols, colnames(match_results_rebuilt_long))
+    if (length(date_int_cols_to_drop) > 0) {
+      match_results_rebuilt_long[, (date_int_cols_to_drop) := NULL]
+    }
+  }
 
   logger::log_info("[MATCHING] - Done reading matching dataset back into R")
 
