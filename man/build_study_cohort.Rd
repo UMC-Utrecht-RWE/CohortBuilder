@@ -12,6 +12,7 @@ build_study_cohort(
     "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED", "CDC_RISK", "SV_SES_STATUS",
     "bivalent_type_received"),
   exposed_batch_size = 50000L,
+  control_batch_size = 50000L,
   dir_matching_db =
     "transformations/T3_study_design/intermediate_data_file/matching.duckdb",
   n_cores = NULL,
@@ -47,6 +48,8 @@ the packaged default target-table SQL is loaded automatically.}
 demographic and risk-related variables such as \code{c("SV_SEX", "SV_REGION", "SV_HIST_COVID_VACC", "SV_BRAND_COVID_VACC", "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED", "CDC_RISK", "SV_SES_STATUS", "bivalent_type_received")}.}
 
 \item{exposed_batch_size}{The batch size for processing exposed individuals during matching without replacement. Default is \code{50000}.}
+
+\item{control_batch_size}{The batch size for processing control individuals during matching without replacement. Default is \code{50000}.}
 
 \item{dir_matching_db}{The file path for the temporary DuckDB database used for matching.
 Default is \code{"transformations/T3_study_design/intermediate_data_file/matching.duckdb"}.}

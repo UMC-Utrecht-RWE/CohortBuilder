@@ -43,6 +43,10 @@ WITH
         WHERE
             S.available = TRUE
             AND P.group = 'control'
+            AND mod(
+                hash(P.spell_id, __START_SEED__),
+                __CONTROL_BUCKET_COUNT__
+            ) = __CONTROL_BUCKET_ID__
     ),
     candidate_pairs AS (
         SELECT
@@ -57,11 +61,12 @@ WITH
             C.ctrl_person_id,
             C.ctrl_startdateINT,
             C.ctrl_enddateINT,
+            hash(E.exp_spell_id, C.ctrl_spell_id, __START_SEED__) AS candidate_order_key,
             ROW_NUMBER() OVER (
                 PARTITION BY
                     E.exp_spell_id
                 ORDER BY
-                    hash(E.exp_spell_id, C.ctrl_spell_id, __START_SEED__),
+                    candidate_order_key,
                     C.ctrl_spell_id
             ) AS candidate_rank
         FROM
@@ -78,46 +83,6 @@ WITH
             candidate_pairs
         WHERE
             candidate_rank = 1
-    ),
-    accepted_by_control AS (
-        SELECT
-            * EXCLUDE (ctrl_pick_rank)
-        FROM
-            (
-                SELECT
-                    P.*,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY
-                            P.ctrl_person_id
-                        ORDER BY
-                            P.exposed_priority,
-                            P.exp_spell_id
-                    ) AS ctrl_pick_rank
-                FROM
-                    proposals P
-            ) X
-        WHERE
-            ctrl_pick_rank = 1
-    ),
-    accepted_final AS (
-        SELECT
-            * EXCLUDE (exp_pick_rank)
-        FROM
-            (
-                SELECT
-                    A.*,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY
-                            A.exp_person_id
-                        ORDER BY
-                            A.exposed_priority,
-                            A.exp_spell_id
-                    ) AS exp_pick_rank
-                FROM
-                    accepted_by_control A
-            ) Y
-        WHERE
-            exp_pick_rank = 1
     )
 SELECT
     exp_spell_id,
@@ -130,8 +95,9 @@ SELECT
     ctrl_spell_id,
     ctrl_person_id,
     ctrl_startdateINT,
-    ctrl_enddateINT
+    ctrl_enddateINT,
+    candidate_order_key
 FROM
-    accepted_final
+    proposals
 ORDER BY
     exposed_priority;

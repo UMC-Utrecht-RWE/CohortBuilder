@@ -15,6 +15,8 @@ match_cohorts_without_replacement(
   save_output = FALSE,
   n_cores = NULL,
   exposed_batch_size = 50000L,
+  control_batch_count = 1L,
+  control_batch_size = NULL,
   start_seed = 42,
   col_person_id = "person_id",
   col_match_id = "match_id",
@@ -60,6 +62,17 @@ cores minus one.}
 per SQL batch within each greedy round. Batching follows global exposed priority
 order to reduce memory pressure while preserving no-replacement behavior.
 Defaults to \code{50000}.}
+
+\item{control_batch_count}{Integer number of deterministic control hash buckets
+to scan per exposed batch. Values > 1 reduce peak join size by scanning
+controls in partitions and retaining the global best control candidate per
+exposed spell before collision resolution. Defaults to \code{1} (no control batching).}
+
+\item{control_batch_size}{Optional integer target number of available control
+spells per control batch. When provided, the function derives
+\code{control_batch_count = ceiling(n_available_controls / control_batch_size)}
+at the start of each round. This is ignored when the matching query does
+not support control-bucket placeholders.}
 
 \item{start_seed}{Integer seed used for deterministic tie-breaking in the greedy
 matching order and control selection.}
