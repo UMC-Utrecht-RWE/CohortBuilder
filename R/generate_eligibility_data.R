@@ -53,7 +53,7 @@ generate_eligibility_data <- function(n = 10000, start_seed = 42, save_output, o
 
   # Generate base data using data.table
   D3_ELIGIBILITY <- data.table::data.table(
-    person_id = sample(paste0("Subject_", 1:(n / 10)), n, replace = TRUE),
+    person_id = sample(paste0("Subject_", 1:(n / 4)), n, replace = TRUE),
     SV_REGION = sample(c(NA, 1, 2, 3), n, replace = TRUE, prob = c(0.05, 0.3, 0.4, 0.25)),
     CDC_RISK = sample(0:2, n, replace = TRUE),
     SV_HIST_COVID_VACC = rpois(n, 0.2),
