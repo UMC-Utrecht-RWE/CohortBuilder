@@ -9,6 +9,7 @@
 #' @param save_output Logical. If TRUE, the generated dataset will be saved to the specified directory.
 #' @param output_dir Character. Directory where the dataset should be saved if `save_output` is TRUE.
 #' @param output_file Character. Name of the output file (without extension). Default is `"D3_ELIGIBILITY"`.
+#' @param n_spells Integer. Number of spells per person. Default is 2.
 #'
 #' @return A data.table containing the generated synthetic dataset with detailed eligibility attributes.
 #'
@@ -45,7 +46,7 @@
 #'   output_file = "SyntheticEligibility"
 #' )
 #' }
-generate_eligibility_data <- function(n = 10000, start_seed = 42, save_output, output_dir, output_file = "D3_ELIGIBILITY") {
+generate_eligibility_data <- function(n = 10000, start_seed = 42, save_output, output_dir, output_file = "D3_ELIGIBILITY", n_spells = 2) {
   logger::log_info(paste0("[MATCHING] - Creating synthetic ", output_file))
 
   # Set seed for reproducibility
@@ -53,7 +54,7 @@ generate_eligibility_data <- function(n = 10000, start_seed = 42, save_output, o
 
   # Generate base data using data.table
   D3_ELIGIBILITY <- data.table::data.table(
-    person_id = sample(paste0("Subject_", 1:(n / 10)), n, replace = TRUE),
+    person_id = sample(paste0("Subject_", 1:(n / n_spells)), n, replace = TRUE),
     SV_REGION = sample(c(NA, 1, 2, 3), n, replace = TRUE, prob = c(0.05, 0.3, 0.4, 0.25)),
     CDC_RISK = sample(0:2, n, replace = TRUE),
     SV_HIST_COVID_VACC = rpois(n, 0.2),
