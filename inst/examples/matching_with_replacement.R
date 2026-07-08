@@ -129,5 +129,6 @@ build_study_cohort(
     col_treatment_group = "group",
     col_T0 = "T0"
   ),
+  age_offset = 1,
   matching_mode = "with_replacement"
 )
