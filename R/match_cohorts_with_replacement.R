@@ -306,11 +306,12 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
       }
 
       # Add date range matching conditions to the query
+      # Handle both -- and /* */ comment styles around the placeholder (formatters may convert between them)
       matching_query_adjusted <- gsub(
-        "-- {{DATE_MATCH_CONDITIONS}}",
+        "(?:--|/\\*)\\s*\\{\\{DATE_MATCH_CONDITIONS\\}\\}(?:\\s*\\*/)?",
         date_match_sql_conditions,
         matching_query_adjusted,
-        fixed = TRUE
+        perl = TRUE
       )
 
       # Modify join type if bootstrap enabled: ensure person used matches once only
