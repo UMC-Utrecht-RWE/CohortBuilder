@@ -314,6 +314,14 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
         perl = TRUE
       )
 
+      # DEBUG: Check if placeholder was substituted
+      if (!is.null(col_date_match) && grepl("DATE_MATCH_CONDITIONS", matching_query_adjusted)) {
+        logger::log_warn(paste0("[MATCHING] - WARNING: Date match placeholder was not substituted for year ", year))
+        logger::log_debug(paste0("[MATCHING] - Date conditions to inject:\n", date_match_sql_conditions))
+      } else if (!is.null(col_date_match)) {
+        logger::log_debug(paste0("[MATCHING] - Date match conditions injected for year ", year))
+      }
+
       # Modify join type if bootstrap enabled: ensure person used matches once only
       if (with_bootstrap) {
         matching_query_adjusted <- gsub(
@@ -441,16 +449,34 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     pid_col <- col_person_id
 
     for (date_col in col_date_match) {
-      # Get one non-NA value per person; persons with all-NA get NA of the correct type
+      # For each matched person, find their date from the matching population
+      # by matching on person_id + matching status dates (which define the spell)
+      # This ensures we get the date for the SPECIFIC SPELL that was matched, not just any spell for that person
+      
+      # Create lookup table from population data with unique person-spell-date combinations
+      # Ensure person_id is character to match the original data types
       date_lookup <- unique(
-        pop_dt[!is.na(get(date_col)), c(pid_col, date_col), with = FALSE],
-        by = pid_col
+        pop_dt[, list(
+          person_id = as.character(get(pid_col)),
+          start = get(col_matching_status_start),
+          end = get(col_matching_status_end),
+          date_value = get(date_col)
+        )],
+        by = c("person_id", "start", "end")
       )
-      date_idx <- match(
-        match_results_rebuilt_long[[col_person_id]],
-        date_lookup[[pid_col]]
+      
+      # Merge with match results using the standard spell identifiers
+      # All matches should have matching start/end dates from the exposed population
+      match_results_rebuilt_long <- merge(
+        match_results_rebuilt_long,
+        date_lookup,
+        by.x = c(col_person_id, col_matching_status_start, col_matching_status_end),
+        by.y = c("person_id", "start", "end"),
+        all.x = TRUE
       )
-      match_results_rebuilt_long[, (date_col) := date_lookup[[date_col]][date_idx]]
+      
+      # Rename the merged date_value column to the original date column name
+      data.table::setnames(match_results_rebuilt_long, "date_value", date_col)
     }
   }
 

@@ -29,6 +29,7 @@ build_study_cohort(
   output_column_names = list(col_person_id = "person_id", col_match_id = "match_id",
     col_treatment_group = "group", col_T0 = "T0"),
   age_offset = 1,
+  date_match_pars = list(col_date_match = NULL, date_match_offsets = NULL),
   matching_mode = "with_replacement"
 )
 }
@@ -96,6 +97,13 @@ which uses all available cores minus one.}
 }}
 
 \item{age_offset}{A numeric value specifying the range of values of col_age_iterator with which to select candidate controls. Defaults to 1. If no range-matching on this variable required, user should set to NULL.}
+
+\item{date_match_pars}{A list of parameters for date range matching:
+\describe{
+\item{\code{col_date_match}}{Character vector of date column names for range matching. Defaults to \code{NULL}.}
+\item{\code{date_match_offsets}}{Named integer vector specifying the offset (in days) for each date column.
+Names must match the column names. Defaults to \code{NULL}.}
+}}
 
 \item{matching_mode}{Matching strategy. Use \code{"with_replacement"} (default) for the
 existing SQL matcher, or \code{"without_replacement"} for greedy no-replacement matching.}

@@ -7,6 +7,7 @@
 get_profile_table(
   eligible_pop = NULL,
   matching_vars = NULL,
+  col_date_match = NULL,
   save_output = FALSE,
   output_dir = NULL,
   output_file = "D3_LOOKUP_TABLE"
@@ -16,6 +17,8 @@ get_profile_table(
 \item{eligible_pop}{A data frame containing the eligible population, including columns for the matching variables.}
 
 \item{matching_vars}{A character vector of variable names used to create the profile table.}
+
+\item{col_date_match}{A character vector of date column names to exclude from the profile table. Defaults to \code{NULL}.}
 
 \item{save_output}{A logical value. If \code{TRUE}, the resulting profile table is saved to the specified directory.}
 

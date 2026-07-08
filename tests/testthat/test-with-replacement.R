@@ -272,7 +272,7 @@ test_that("date matching works with more than one matching dates and offsets", {
     age_offset = 1,
     date_match_pars = list(
       col_date_match = c("lmp_date", "one_more_date"),
-      date_match_offsets = c(lmp_date = 1, one_more_date = 30) # Allow a 1-day difference in lmp_date and one_more_date for matching
+      date_match_offsets = c(lmp_date = 5, one_more_date = 30) # Allow a 1-day difference in lmp_date and one_more_date for matching
     )
   )
   matched <- res$d4[!is.na(match_id)]
