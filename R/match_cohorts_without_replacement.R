@@ -29,6 +29,10 @@
 #'   `.parquet` file. If `FALSE`, returns the matched cohort as an object.
 #' @param n_cores Integer number of DuckDB threads to use. Defaults to all detected
 #'   cores minus one.
+#' @param exposed_batch_size Integer cap on the number of exposed spells processed
+#'   per SQL batch within each greedy round. Batching follows global exposed priority
+#'   order to reduce memory pressure while preserving no-replacement behavior.
+#'   Defaults to `50000`.
 #' @param start_seed Integer seed used for deterministic tie-breaking in the greedy
 #'   matching order and control selection.
 #' @param col_person_id Column name for the person identifier. Default is `"person_id"`.
@@ -105,6 +109,7 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
                                               result_file = NULL,
                                               save_output = FALSE,
                                               n_cores = NULL,
+                                              exposed_batch_size = 50000L,
                                               start_seed = 42,
                                               col_person_id = "person_id",
                                               col_match_id = "match_id",
@@ -133,6 +138,11 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
     n_cores <- parallel::detectCores() - 1
     logger::log_info(paste0("The parameter `n_cores` was not specified. By default ", n_cores, " will be used in the SQL matching procedure."))
   }
+
+  if (is.null(exposed_batch_size) || !is.numeric(exposed_batch_size) || length(exposed_batch_size) != 1L || is.na(exposed_batch_size) || exposed_batch_size < 1) {
+    stop("`exposed_batch_size` must be a single positive integer.")
+  }
+  exposed_batch_size <- as.integer(exposed_batch_size)
 
   # Set DuckDB thread configuration
   DBI::dbExecute(matching_conn, paste0("PRAGMA threads=", n_cores, ";"))
@@ -201,63 +211,110 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
 
   # Replace seed placeholder in matching query for deterministic reproducibility
   matching_query_adjusted <- gsub("__START_SEED__", as.character(as.integer(start_seed)), matching_query, fixed = TRUE)
+  has_priority_window <- grepl("__EXPOSED_PRIORITY_MIN__", matching_query_adjusted, fixed = TRUE) &&
+    grepl("__EXPOSED_PRIORITY_MAX__", matching_query_adjusted, fixed = TRUE)
+  if (!has_priority_window) {
+    logger::log_info("[MATCHING-NR] - Priority-window placeholders not found in `matching_query`; batching is disabled for this run")
+  }
 
   # Begin greedy matching rounds: continue until no more pairs can be formed
   repeat {
-    # Generate candidate exposed-control pairs for current pool of available people
     logger::log_info(paste0("[MATCHING-NR] - Round ", round_id, ": computing greedy proposals"))
 
-    accepted_round <- DBI::dbGetQuery(matching_conn, matching_query_adjusted)
-    accepted_round <- data.table::as.data.table(accepted_round)
+    exposed_n <- as.integer(DBI::dbGetQuery(matching_conn, "
+      SELECT COUNT(*) AS n
+      FROM pool_nr P
+      INNER JOIN person_state_nr S ON S.person_id = P.person_id
+      WHERE S.available = TRUE AND P.group = 'exposed'
+    ")$n[[1L]])
 
-    # Exit matching loop when no more candidate pairs are available
-    if (nrow(accepted_round) == 0L) {
-      logger::log_info(paste0("[MATCHING-NR] - Round ", round_id, ": no further pairs found"))
+    if (is.na(exposed_n) || exposed_n == 0L) {
+      logger::log_info(paste0("[MATCHING-NR] - Round ", round_id, ": no exposed persons remain available"))
       break
     }
 
-    # Sort candidates by exposed spell priority and start date for deterministic ordering
-    data.table::setorder(accepted_round, exposed_priority, exp_startdateINT, exp_spell_id)
-    # Extract person identifiers and build reverse lookup for collision detection
-    exp_ids <- accepted_round$exp_person_id
-    ctrl_ids <- accepted_round$ctrl_person_id
-    person_levels <- unique(c(exp_ids, ctrl_ids))
-    exp_idx <- data.table::chmatch(exp_ids, person_levels)
-    ctrl_idx <- data.table::chmatch(ctrl_ids, person_levels)
-    # Track which people have already been assigned in this round
-    used_people <- rep(FALSE, length(person_levels))
-    keep_idx <- logical(nrow(accepted_round))
-
-    # Resolve collisions: ensure each person appears at most once per round
-    for (i in seq_len(nrow(accepted_round))) {
-      cat(sprintf("\rChecking matched pairs for duplicates, %d%% ready...", round((i / nrow(accepted_round)) * 100)))
-
-      exp_i <- exp_idx[[i]]
-      ctrl_i <- ctrl_idx[[i]]
-      # Keep pair only if both exposed and control are still available in this round
-      if (!used_people[[exp_i]] && !used_people[[ctrl_i]]) {
-        keep_idx[[i]] <- TRUE
-        used_people[[exp_i]] <- TRUE
-        used_people[[ctrl_i]] <- TRUE
-      }
+    n_batches <- if (has_priority_window) {
+      as.integer(ceiling(exposed_n / exposed_batch_size))
+    } else {
+      1L
     }
-    # Filter to non-colliding pairs only
-    accepted_round <- accepted_round[keep_idx]
 
-    # Exit if all candidate pairs dissolved due to collisions
-    if (nrow(accepted_round) == 0L) {
+    round_matches <- list()
+    round_used_people <- character()
+
+    for (batch_id in seq_len(n_batches)) {
+      batch_query <- matching_query_adjusted
+
+      if (has_priority_window) {
+        batch_min <- as.integer((batch_id - 1L) * exposed_batch_size + 1L)
+        batch_max <- as.integer(min(batch_id * exposed_batch_size, exposed_n))
+        batch_query <- gsub("__EXPOSED_PRIORITY_MIN__", as.character(batch_min), batch_query, fixed = TRUE)
+        batch_query <- gsub("__EXPOSED_PRIORITY_MAX__", as.character(batch_max), batch_query, fixed = TRUE)
+        logger::log_info(paste0(
+          "[MATCHING-NR] - Round ", round_id, ", batch ", batch_id, "/", n_batches,
+          ": exposed priority ", batch_min, "-", batch_max
+        ))
+      }
+
+      accepted_batch <- DBI::dbGetQuery(matching_conn, batch_query)
+      accepted_batch <- data.table::as.data.table(accepted_batch)
+
+      if (nrow(accepted_batch) == 0L) {
+        next
+      }
+
+      data.table::setorder(accepted_batch, exposed_priority, exp_startdateINT, exp_spell_id)
+
+      # Keep round-level person uniqueness across previously accepted batches.
+      if (length(round_used_people) > 0L) {
+        accepted_batch <- accepted_batch[
+          !exp_person_id %in% round_used_people & !ctrl_person_id %in% round_used_people
+        ]
+      }
+
+      if (nrow(accepted_batch) == 0L) {
+        next
+      }
+
+      exp_ids <- accepted_batch$exp_person_id
+      ctrl_ids <- accepted_batch$ctrl_person_id
+      person_levels <- unique(c(round_used_people, exp_ids, ctrl_ids))
+      exp_idx <- data.table::chmatch(exp_ids, person_levels)
+      ctrl_idx <- data.table::chmatch(ctrl_ids, person_levels)
+      used_people <- person_levels %in% round_used_people
+      keep_idx <- logical(nrow(accepted_batch))
+
+      for (i in seq_len(nrow(accepted_batch))) {
+        exp_i <- exp_idx[[i]]
+        ctrl_i <- ctrl_idx[[i]]
+        if (!used_people[[exp_i]] && !used_people[[ctrl_i]]) {
+          keep_idx[[i]] <- TRUE
+          used_people[[exp_i]] <- TRUE
+          used_people[[ctrl_i]] <- TRUE
+        }
+      }
+
+      accepted_batch <- accepted_batch[keep_idx]
+      if (nrow(accepted_batch) == 0L) {
+        next
+      }
+
+      accepted_batch[, match_id := seq.int(next_match_id, next_match_id + .N - 1L)]
+      next_match_id <- next_match_id + nrow(accepted_batch)
+      round_matches[[length(round_matches) + 1L]] <- accepted_batch
+      round_used_people <- unique(c(round_used_people, accepted_batch$exp_person_id, accepted_batch$ctrl_person_id))
+    }
+
+    if (length(round_matches) == 0L) {
       logger::log_info(paste0("[MATCHING-NR] - Round ", round_id, ": proposals dissolved by person-level tie-breaking"))
       break
     }
 
-    # Assign unique match identifiers to accepted pairs and store results
-    accepted_round[, match_id := seq.int(next_match_id, next_match_id + .N - 1L)]
-    next_match_id <- next_match_id + nrow(accepted_round)
+    accepted_round <- data.table::rbindlist(round_matches, use.names = TRUE)
     all_matches[[length(all_matches) + 1L]] <- accepted_round
 
-    # Extract all matched people (both exposed and control) from this round
     matched_persons <- data.table::data.table(
-      person_id = unique(c(accepted_round$exp_person_id, accepted_round$ctrl_person_id))
+      person_id = round_used_people
     )
 
     # Update person availability state: mark matched people as unavailable for future rounds

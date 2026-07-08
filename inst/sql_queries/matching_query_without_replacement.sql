@@ -1,5 +1,5 @@
 WITH
-    exposed_available AS (
+    exposed_ranked AS (
         SELECT
             P.spell_id AS exp_spell_id,
             P.person_id AS exp_person_id,
@@ -20,6 +20,14 @@ WITH
         WHERE
             S.available = TRUE
             AND P.group = 'exposed'
+    ),
+    exposed_available AS (
+        SELECT
+            *
+        FROM
+            exposed_ranked
+        WHERE
+            exposed_priority BETWEEN __EXPOSED_PRIORITY_MIN__ AND __EXPOSED_PRIORITY_MAX__
     ),
     control_available AS (
         SELECT

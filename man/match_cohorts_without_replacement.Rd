@@ -14,6 +14,7 @@ match_cohorts_without_replacement(
   result_file = NULL,
   save_output = FALSE,
   n_cores = NULL,
+  exposed_batch_size = 50000L,
   start_seed = 42,
   col_person_id = "person_id",
   col_match_id = "match_id",
@@ -54,6 +55,11 @@ and execute the greedy candidate selection queries.}
 
 \item{n_cores}{Integer number of DuckDB threads to use. Defaults to all detected
 cores minus one.}
+
+\item{exposed_batch_size}{Integer cap on the number of exposed spells processed
+per SQL batch within each greedy round. Batching follows global exposed priority
+order to reduce memory pressure while preserving no-replacement behavior.
+Defaults to \code{50000}.}
 
 \item{start_seed}{Integer seed used for deterministic tie-breaking in the greedy
 matching order and control selection.}

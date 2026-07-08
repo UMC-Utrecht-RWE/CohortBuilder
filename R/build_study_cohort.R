@@ -18,6 +18,7 @@
 #'   demographic and risk-related variables such as `c("SV_SEX", "SV_REGION",
 #'   "SV_HIST_COVID_VACC", "SV_BRAND_COVID_VACC", "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED",
 #'   "CDC_RISK", "SV_SES_STATUS", "bivalent_type_received")`.
+#' @param exposed_batch_size The batch size for processing exposed individuals during matching without replacement. Default is `50000`.
 #' @param dir_matching_db The file path for the temporary DuckDB database used for matching.
 #'   Default is `"transformations/T3_study_design/intermediate_data_file/matching.duckdb"`.
 #' @param n_cores Number of CPU cores to use for parallel processing. Default is `NULL`,
@@ -92,6 +93,7 @@ build_study_cohort <- function(eligible_pop = NULL,
                                  "SV_SEX", "SV_REGION", "SV_HIST_COVID_VACC", "SV_BRAND_COVID_VACC",
                                  "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED", "CDC_RISK", "SV_SES_STATUS", "bivalent_type_received"
                                ),
+                               exposed_batch_size = 50000L,
                                dir_matching_db = "transformations/T3_study_design/intermediate_data_file/matching.duckdb",
                                n_cores = NULL,
                                log_name = "log_build_study_cohort",
@@ -294,7 +296,8 @@ build_study_cohort <- function(eligible_pop = NULL,
       col_age_iterator = input_column_names$col_age_iterator,
       col_match_id = output_column_names$col_match_id,
       col_treatment_group = output_column_names$col_treatment_group,
-      col_T0 = output_column_names$col_T0
+      col_T0 = output_column_names$col_T0,
+      exposed_batch_size = exposed_batch_size
     )
   }
 
