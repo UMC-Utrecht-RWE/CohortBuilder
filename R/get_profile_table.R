@@ -7,6 +7,7 @@
 #'
 #' @param eligible_pop A data frame containing the eligible population, including columns for the matching variables.
 #' @param matching_vars A character vector of variable names used to create the profile table.
+#' @param col_date_match A character vector of date column names to exclude from the profile table. Defaults to `NULL`.
 #' @param save_output A logical value. If `TRUE`, the resulting profile table is saved to the specified directory.
 #' @param output_dir A string specifying the directory to save the output if `save_output` is `TRUE`.
 #' @param output_file A string specifying the file name for the saved output. Defaults to `"D3_LOOKUP_TABLE"`.
@@ -26,16 +27,19 @@
 #' }
 #'
 #' @export
-get_profile_table <- function(eligible_pop = NULL, matching_vars = NULL, save_output = FALSE, output_dir = NULL, output_file = "D3_LOOKUP_TABLE") {
+get_profile_table <- function(eligible_pop = NULL, matching_vars = NULL, col_date_match = NULL, save_output = FALSE, output_dir = NULL, output_file = "D3_LOOKUP_TABLE") {
   logger::log_info("[MATCHING] - Creating lookup table")
 
   # Convert to data.table
   eligible_pop_dt <- data.table::as.data.table(eligible_pop)
 
+  # Exclude date match columns from profile table grouping
+  profile_vars <- setdiff(matching_vars, col_date_match)
+
   # Filter and create the profile table with unique combinations of matching variables
-  profile_table <- eligible_pop_dt[, ..matching_vars][
+  profile_table <- eligible_pop_dt[, profile_vars, with = FALSE][
     , .SD[!duplicated(.SD)],
-    .SDcols = matching_vars # Get unique rows
+    .SDcols = profile_vars # Get unique rows
   ][
     , groupkey := .I # Assign a unique integer identifier
   ]

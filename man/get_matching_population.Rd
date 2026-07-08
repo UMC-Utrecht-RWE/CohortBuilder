@@ -16,7 +16,9 @@ get_matching_population(
   col_eligible_control = "eligible_control",
   col_matching_status_start = "matching_status_start",
   col_matching_status_end = "matching_status_end",
-  col_age_iterator = "year_of_birth"
+  col_age_iterator = "year_of_birth",
+  col_date_match = NULL,
+  date_match_offsets = NULL
 )
 }
 \arguments{
@@ -43,6 +45,11 @@ get_matching_population(
 \item{col_matching_status_end}{A string specifying the column name for the end date of the matching status. Defaults to \code{"matching_status_end"}.}
 
 \item{col_age_iterator}{A string specifying the column name for the year of birth or age iterator. Defaults to \code{"year_of_birth"}.}
+
+\item{col_date_match}{A character vector of date column names for range matching. Defaults to \code{NULL}.}
+
+\item{date_match_offsets}{A named integer vector specifying the offset (in days) for each date column in \code{col_date_match}.
+Names must match the column names. Defaults to \code{NULL}.}
 }
 \value{
 A data.table of the matching population, with individuals grouped into "exposed" and "control" groups.

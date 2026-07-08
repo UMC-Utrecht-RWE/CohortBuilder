@@ -60,6 +60,12 @@
 #'     \item{`col_T0`}{Column name for the T0 variable. Default is `"T0"`.}
 #'   }
 #' @param age_offset A numeric value specifying the range of values of col_age_iterator with which to select candidate controls. Defaults to 1. If no range-matching on this variable required, user should set to NULL.
+#' @param date_match_pars A list of parameters for date range matching:
+#'   \describe{
+#'     \item{`col_date_match`}{Character vector of date column names for range matching. Defaults to `NULL`.}
+#'     \item{`date_match_offsets`}{Named integer vector specifying the offset (in days) for each date column.
+#'       Names must match the column names. Defaults to `NULL`.}
+#'   }
 #' @param matching_mode Matching strategy. Use `"with_replacement"` (default) for the
 #'   existing SQL matcher, or `"without_replacement"` for greedy no-replacement matching.
 #'
@@ -128,6 +134,10 @@ build_study_cohort <- function(eligible_pop = NULL,
                                  col_T0 = "T0"
                                ),
                                age_offset = 1,
+                               date_match_pars = list(
+                                 col_date_match = NULL,
+                                 date_match_offsets = NULL
+                               ),
                                matching_mode = "with_replacement") {
   #########################################
   #### Set up the matching environment ####
@@ -228,6 +238,7 @@ build_study_cohort <- function(eligible_pop = NULL,
   D3_LOOKUP_TABLE <- get_profile_table(
     eligible_pop = eligible_pop,
     matching_vars = matching_vars,
+    col_date_match = date_match_pars$col_date_match,
     save_output = intermediate_output_pars$save_intermediate_outputs,
     output_dir = intermediate_output_pars$dir_intermediate_outputs,
     output_file = intermediate_output_pars$profile_table_name
@@ -249,7 +260,9 @@ build_study_cohort <- function(eligible_pop = NULL,
     col_eligible_control = input_column_names$col_eligible_control,
     col_matching_status_start = input_column_names$col_matching_status_start,
     col_matching_status_end = input_column_names$col_matching_status_end,
-    col_age_iterator = input_column_names$col_age_iterator
+    col_age_iterator = input_column_names$col_age_iterator,
+    col_date_match = date_match_pars$col_date_match,
+    date_match_offsets = date_match_pars$date_match_offsets
   )
 
   ###########################################
@@ -279,7 +292,9 @@ build_study_cohort <- function(eligible_pop = NULL,
       age_offset = age_offset,
       col_match_id = output_column_names$col_match_id,
       col_treatment_group = output_column_names$col_treatment_group,
-      col_T0 = output_column_names$col_T0
+      col_T0 = output_column_names$col_T0,
+      col_date_match = date_match_pars$col_date_match,
+      date_match_offsets = date_match_pars$date_match_offsets
     )
   } else {
     D4_MSC <- match_cohorts_without_replacement(

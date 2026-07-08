@@ -2,12 +2,7 @@ WITH
     dfexpORD AS (
         -- Here we're going to select all exposed persons for a single year. We'll change this year in the R-script
         SELECT
-            person_id,
-            groupkey,
-            match_id,
-            startdateINT,
-            enddateINT,
-            random
+            *
         FROM
             dfexp
         WHERE
@@ -20,11 +15,7 @@ WITH
     dfunORD AS (
         -- Here we're going to select all unexposed persons for two years to match between. We'll change this year in the R-script
         SELECT
-            person_id,
-            groupkey,
-            startdateINT,
-            enddateINT,
-            random
+            *
         FROM
             dfun
         WHERE
@@ -52,6 +43,7 @@ WITH
             -- Join (match) the exposed to the unexposed based on the groupkey (profile) and the spell periods (start exposed between start and end unexposed)
             ON E.groupkey = U.groupkey
             AND E.startdateINT BETWEEN U.startdateINT AND U.enddateINT
+            -- {{DATE_MATCH_CONDITIONS}}
     ),
     least AS (
         -- Here we're going to select the row with the lowest RandomDiff per match_id

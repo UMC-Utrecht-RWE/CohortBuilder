@@ -26,7 +26,9 @@ match_cohorts_with_replacement(
   col_matching_status_start = "matching_status_start",
   col_matching_status_end = "matching_status_end",
   col_age_iterator = "year_of_birth",
-  age_offset = 1
+  age_offset = 1,
+  col_date_match = NULL,
+  date_match_offsets = NULL
 )
 }
 \arguments{
@@ -73,6 +75,11 @@ match_cohorts_with_replacement(
 \item{col_age_iterator}{A string specifying the column name for the (numeric) year of birth or age iterator. Defaults to \code{"year_of_birth"}.}
 
 \item{age_offset}{A numeric value specifying the range of values of col_age_iterator with which to select candidate controls. Defaults to 1. If no range-matching on this variable required, user should set to NULL.}
+
+\item{col_date_match}{A character vector of date column names for range matching. Defaults to \code{NULL}.}
+
+\item{date_match_offsets}{A named integer vector specifying the offset (in days) for each date column in \code{col_date_match}.
+Names must match the column names. Defaults to \code{NULL}.}
 }
 \value{
 If \code{with_bootstrap} is \code{FALSE} and \code{save_output} is \code{FALSE}, the function returns a data.table of the matched population.
