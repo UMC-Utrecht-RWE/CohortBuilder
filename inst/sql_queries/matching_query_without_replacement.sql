@@ -72,7 +72,7 @@ WITH
         FROM
             exposed_available E
             INNER JOIN control_available C ON C.groupkey = E.groupkey
-            AND C.ctrl_year_of_birth BETWEEN E.exp_year_of_birth - 1 AND E.exp_year_of_birth  + 1
+            AND C.ctrl_year_of_birth BETWEEN E.exp_year_of_birth - __AGE_OFFSET__ AND E.exp_year_of_birth  + __AGE_OFFSET__
             AND E.exp_startdateINT BETWEEN C.ctrl_startdateINT AND C.ctrl_enddateINT
             AND E.exp_person_id <> C.ctrl_person_id
     ),

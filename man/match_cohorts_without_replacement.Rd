@@ -24,7 +24,8 @@ match_cohorts_without_replacement(
   col_T0 = "T0",
   col_matching_status_start = "matching_status_start",
   col_matching_status_end = "matching_status_end",
-  col_age_iterator = "year_of_birth"
+  col_age_iterator = "year_of_birth",
+  age_offset = 1L
 )
 }
 \arguments{
@@ -95,6 +96,11 @@ Default is \code{"matching_status_end"}.}
 
 \item{col_age_iterator}{Column name for the year-of-birth matching variable.
 Default is \code{"year_of_birth"}.}
+
+\item{age_offset}{Non-negative integer tolerance for year-of-birth matching.
+Controls candidate eligibility as control year of birth between exposed year
+of birth \code{- age_offset} and exposed year of birth \code{+ age_offset}.
+Default is \code{1}.}
 }
 \value{
 If \code{save_output = FALSE}, returns a data.table with one row per

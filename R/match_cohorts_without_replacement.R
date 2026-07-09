@@ -56,6 +56,10 @@
 #'   Default is `"matching_status_end"`.
 #' @param col_age_iterator Column name for the year-of-birth matching variable.
 #'   Default is `"year_of_birth"`.
+#' @param age_offset Non-negative integer tolerance for year-of-birth matching.
+#'   Controls candidate eligibility as control year of birth between exposed year
+#'   of birth `- age_offset` and exposed year of birth `+ age_offset`.
+#'   Default is `1`.
 #'
 #' @return If `save_output = FALSE`, returns a data.table with one row per
 #'   output cohort record. Matched exposed and matched controls share the same
@@ -128,7 +132,8 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
                                               col_T0 = "T0",
                                               col_matching_status_start = "matching_status_start",
                                               col_matching_status_end = "matching_status_end",
-                                              col_age_iterator = "year_of_birth") {
+                                              col_age_iterator = "year_of_birth",
+                                              age_offset = 1L) {
   # Load packaged default SQL when query is not provided
   if (is_empty_query(matching_query)) {
     default_matching_query_file <- "matching_query_without_replacement.sql"
@@ -166,6 +171,11 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
     }
     control_batch_size <- as.integer(control_batch_size)
   }
+
+  if (!is.numeric(age_offset) || length(age_offset) != 1L || is.na(age_offset) || age_offset < 0) {
+    stop("`age_offset` must be a single non-negative integer.")
+  }
+  age_offset <- as.integer(age_offset)
 
   # Set DuckDB thread configuration
   DBI::dbExecute(matching_conn, paste0("PRAGMA threads=", n_cores, ";"))
@@ -234,6 +244,7 @@ match_cohorts_without_replacement <- function(matching_pop_groupkey = NULL,
 
   # Replace seed placeholder in matching query for deterministic reproducibility
   matching_query_adjusted <- gsub("__START_SEED__", as.character(as.integer(start_seed)), matching_query, fixed = TRUE)
+  matching_query_adjusted <- gsub("__AGE_OFFSET__", as.character(age_offset), matching_query_adjusted, fixed = TRUE)
   has_priority_window <- grepl("__EXPOSED_PRIORITY_MIN__", matching_query_adjusted, fixed = TRUE) &&
     grepl("__EXPOSED_PRIORITY_MAX__", matching_query_adjusted, fixed = TRUE)
   has_control_window <- grepl("__CONTROL_BUCKET_COUNT__", matching_query_adjusted, fixed = TRUE) &&

@@ -304,11 +304,13 @@ build_study_cohort <- function(eligible_pop = NULL,
       col_T0 = output_column_names$col_T0
     )
   } else {
+    matching_query_nr <- gsub("__AGE_OFFSET__", as.character(as.integer(age_offset)), matching_query, fixed = TRUE)
+
     D4_MSC <- match_cohorts_without_replacement(
       matching_pop_groupkey = D3_MATCHING_POP,
       profile_table = D3_LOOKUP_TABLE,
       matching_vars = matching_vars,
-      matching_query = matching_query,
+      matching_query = matching_query_nr,
       matching_conn = matching_conn,
       save_output = FALSE,
       n_cores = n_cores,
