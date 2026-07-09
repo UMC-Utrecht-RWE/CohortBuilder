@@ -23,14 +23,13 @@ make_d3 <- function(n_spells = 2e5, seed = 42L) {
   )
 }
 
-run_pipeline <- function(d3, seed = 42L) {
+run_pipeline <- function(d3, seed = 42L, age_offset = 1) {
   matching_vars <- c(
-    "SV_SEX", "SV_REGION", "SV_HIST_COVID_VACC", "SV_PRIOR_COVID_DG", "SV_BRAND_COVID_VACC",
-    "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED", "CDC_RISK", "SV_SES_STATUS"
+    "SV_SEX", "SV_REGION", "SV_PRIOR_COVID_DG", "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED", "CDC_RISK", "SV_SES_STATUS"
   )
 
   matching_query <- suppressWarnings(
-    getSQL(system.file("sql_queries", "matching_query_without_replacement.sql", package = "CohortBuilder"))
+    getSQL(system.file("sql_queries", "matching_query_with_replacement.sql", package = "CohortBuilder"))
   )
   target_table_query <- getSQL(
     system.file("sql_queries", "create_matching_target_table.sql", package = "CohortBuilder")
@@ -77,13 +76,13 @@ run_pipeline <- function(d3, seed = 42L) {
         col_treatment_group = "group",
         col_T0 = "T0"
       ),
-      matching_mode = "without_replacement"
+      age_offset = age_offset,
+      matching_mode = "with_replacement"
     )
   )
 
   list(d3 = d3, d4 = d4, matching_vars = c(
-    "SV_SEX", "SV_REGION", "SV_HIST_COVID_VACC", "SV_PRIOR_COVID_DG", "SV_BRAND_COVID_VACC",
-    "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED", "CDC_RISK", "SV_SES_STATUS"
+    "SV_SEX", "SV_REGION", "SV_PRIOR_COVID_DG", "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED", "CDC_RISK", "SV_SES_STATUS"
   ))
 }
 
@@ -91,7 +90,7 @@ run_pipeline <- function(d3, seed = 42L) {
 
 d3 <- make_d3()
 
-test_that("no-replacement pipeline runs and returns a data.table", {
+test_that("with-replacement pipeline runs and returns a data.table", {
   res <- run_pipeline(d3)
   expect_s3_class(res$d4, "data.table")
   expect_gt(nrow(res$d4), 0L)
@@ -109,46 +108,6 @@ test_that("D4 group labels are only EXPOSED, CONTROL, or UNMATCHED", {
   expect_true(all(res$d4$group %chin% c("EXPOSED", "CONTROL", "UNMATCHED")))
 })
 
-test_that("no person appears in more than one matched row (strict no replacement)", {
-  res <- run_pipeline(d3)
-  matched <- res$d4[!is.na(match_id)]
-  dup <- matched[, .N, by = person_id][N > 1L]
-  expect_equal(nrow(dup), 0L)
-})
-
-test_that("UNMATCHED rows have NA match_id; matched rows have non-NA match_id and valid group", {
-  res <- run_pipeline(d3)
-  expect_true(res$d4[group == "UNMATCHED", all(is.na(match_id))])
-  matched <- res$d4[!is.na(match_id)]
-  expect_true(matched[, all(group %chin% c("EXPOSED", "CONTROL"))])
-})
-
-test_that("each match_id has exactly one EXPOSED and one CONTROL row with identical T0", {
-  res <- run_pipeline(d3)
-  matched <- res$d4[!is.na(match_id)]
-
-  if (nrow(matched) == 0L) skip("No matched pairs produced")
-
-  pair_counts <- matched[, .N, by = match_id]
-  expect_true(pair_counts[, all(N == 2L)])
-
-  pair_group <- matched[, .N, by = .(match_id, group)]
-  expect_true(pair_group[, all(N == 1L)])
-
-  pair_t0 <- matched[, .(n_t0 = data.table::uniqueN(T0)), by = match_id]
-  expect_true(pair_t0[, all(n_t0 == 1L)])
-})
-
-test_that("no self-match pairs (exposed and control person_id differ within each pair)", {
-  res <- run_pipeline(d3)
-  matched <- res$d4[!is.na(match_id)]
-
-  if (nrow(matched) == 0L) skip("No matched pairs produced")
-
-  self_match <- matched[, .(n_person = data.table::uniqueN(person_id)), by = match_id][n_person < 2L]
-  expect_equal(nrow(self_match), 0L)
-})
-
 test_that("matching variables are identical within each matched pair", {
   res <- run_pipeline(d3)
   matched <- res$d4[!is.na(match_id)]
@@ -163,4 +122,44 @@ test_that("matching variables are identical within each matched pair", {
       label = paste0("matching variable `", v, "` is equal within each pair")
     )
   }
+})
+
+test_that("matched pairs have the same year_of_birth if age_offset = 0", {
+  res <- run_pipeline(d3, seed = 42L, age_offset = 0)
+  matched <- res$d4[!is.na(match_id)]
+
+  if (nrow(matched) == 0L) skip("No matched pairs produced")
+
+  by_var <- matched[, .(n_unique = data.table::uniqueN(year_of_birth)), by = match_id]
+  expect_true(
+    by_var[, all(n_unique == 1L)],
+    label = "year_of_birth is equal within each pair"
+  )
+})
+
+test_that("matched pairs have year_of_birth within age_offset if age_offset > 0", {
+  age_offset <- 2
+  res <- run_pipeline(d3, seed = 42L, age_offset = age_offset)
+  matched <- res$d4[!is.na(match_id)]
+
+  if (nrow(matched) == 0L) skip("No matched pairs produced")
+
+  by_var <- matched[, .(min_yob = min(year_of_birth), max_yob = max(year_of_birth)), by = match_id]
+  expect_true(
+    by_var[, all((max_yob - min_yob) <= age_offset)],
+    label = paste0("year_of_birth is within age_offset of ", age_offset, " within each pair")
+  )
+})
+
+test_that("if age_offset = NULL, year_of_birth values can vary within each pair", {
+  res <- run_pipeline(d3, seed = 42L, age_offset = NULL)
+  matched <- res$d4[!is.na(match_id)]
+
+  if (nrow(matched) == 0L) skip("No matched pairs produced")
+
+  by_var <- matched[, .(min_yob = min(year_of_birth), max_yob = max(year_of_birth)), by = match_id]
+  expect_true(
+    by_var[, any((max_yob - min_yob) > 1)],
+    label = "year_of_birth can vary within each pair when age_offset is NULL"
+  )
 })

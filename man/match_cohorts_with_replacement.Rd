@@ -25,7 +25,8 @@ match_cohorts_with_replacement(
   col_T0 = "T0",
   col_matching_status_start = "matching_status_start",
   col_matching_status_end = "matching_status_end",
-  col_age_iterator = "year_of_birth"
+  col_age_iterator = "year_of_birth",
+  age_offset = 1
 )
 }
 \arguments{
@@ -69,7 +70,9 @@ match_cohorts_with_replacement(
 
 \item{col_matching_status_end}{A string specifying the column name for the end date of the matching status. Defaults to \code{"matching_status_end"}.}
 
-\item{col_age_iterator}{A string specifying the column name for the year of birth or age iterator. Defaults to \code{"year_of_birth"}.}
+\item{col_age_iterator}{A string specifying the column name for the (numeric) year of birth or age iterator. Defaults to \code{"year_of_birth"}.}
+
+\item{age_offset}{A numeric value specifying the range of values of col_age_iterator with which to select candidate controls. Defaults to 1. If no range-matching on this variable required, user should set to NULL.}
 }
 \value{
 If \code{with_bootstrap} is \code{FALSE} and \code{save_output} is \code{FALSE}, the function returns a data.table of the matched population.
@@ -78,7 +81,9 @@ If \code{save_output} is \code{TRUE}, the results are saved to the specified fil
 \description{
 This function performs matching between exposed and control populations within a study cohort,
 with optional bootstrapping to account for variability in the results. Matching is performed
-using a provided SQL query, leveraging DuckDB for efficient data handling.
+using a provided SQL query, leveraging DuckDB for efficient data handling. Matching is done by batches defined by unique values of col_age_iterator (by default year of birth) of the exposed which is assumed numeric.
+Candidate control matches are selected based on the profile table, and having col_age_iterator value between col_age_iterator - age_offset and col_age_iterator + age_offset.
+If no range matching on col_age_iterator is required, set age_offset to NULL. In that case, all candidate controls are selected
 }
 \details{
 \itemize{
