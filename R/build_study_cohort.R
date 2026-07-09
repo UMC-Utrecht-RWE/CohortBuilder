@@ -258,7 +258,25 @@ build_study_cohort <- function(eligible_pop = NULL,
   #### Match with optional bootstrapping ####
   ###########################################
 
+  # Default duckdb temp directory is beside the database file, to avoid reliance on OS temp paths that may be unavailable on some Windows setups.
+  matching_db_parent <- if (identical(dirname(dir_matching_db), ".")) getwd() else dirname(dir_matching_db)
+  duckdb_temp_dir <- file.path(matching_db_parent, "duckdb_temp")
+  .ensure_directory(duckdb_temp_dir, "DuckDB temp")
+
+  # Use a stable, writable temp spill directory beside the DB file.
+  # This avoids reliance on OS temp paths that may be unavailable on some Windows setups.
+  duckdb_temp_dir_normalized <- normalizePath(duckdb_temp_dir, winslash = "/", mustWork = FALSE)
+
   matching_conn <- DBI::dbConnect(duckdb::duckdb(), dir_matching_db)
+  DBI::dbExecute(
+    matching_conn,
+    paste0(
+      "PRAGMA temp_directory='",
+      gsub("'", "''", duckdb_temp_dir_normalized, fixed = TRUE),
+      "';"
+    )
+  )
+  logger::log_info(paste0("[MATCHING] - DuckDB temp_directory set to: ", duckdb_temp_dir_normalized))
 
   if (matching_mode == "with_replacement") {
     D4_MSC <- match_cohorts_with_replacement(
