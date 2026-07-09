@@ -18,6 +18,8 @@
 #'   demographic and risk-related variables such as `c("SV_SEX", "SV_REGION",
 #'   "SV_HIST_COVID_VACC", "SV_BRAND_COVID_VACC", "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED",
 #'   "CDC_RISK", "SV_SES_STATUS", "bivalent_type_received")`.
+#' @param exposed_batch_size The batch size for processing exposed individuals during matching without replacement. Default is `50000`.
+#' @param control_batch_size The batch size for processing control individuals during matching without replacement. Default is `50000`.
 #' @param dir_matching_db The file path for the temporary DuckDB database used for matching.
 #'   Default is `"transformations/T3_study_design/intermediate_data_file/matching.duckdb"`.
 #' @param n_cores Number of CPU cores to use for parallel processing. Default is `NULL`,
@@ -93,6 +95,8 @@ build_study_cohort <- function(eligible_pop = NULL,
                                  "SV_SEX", "SV_REGION", "SV_HIST_COVID_VACC", "SV_BRAND_COVID_VACC",
                                  "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED", "CDC_RISK", "SV_SES_STATUS", "bivalent_type_received"
                                ),
+                               exposed_batch_size = 50000L,
+                               control_batch_size = 50000L,
                                dir_matching_db = "transformations/T3_study_design/intermediate_data_file/matching.duckdb",
                                n_cores = NULL,
                                log_name = "log_build_study_cohort",
@@ -256,7 +260,25 @@ build_study_cohort <- function(eligible_pop = NULL,
   #### Match with optional bootstrapping ####
   ###########################################
 
+  # Default duckdb temp directory is beside the database file, to avoid reliance on OS temp paths that may be unavailable on some Windows setups.
+  matching_db_parent <- if (identical(dirname(dir_matching_db), ".")) getwd() else dirname(dir_matching_db)
+  duckdb_temp_dir <- file.path(matching_db_parent, "duckdb_temp")
+  .ensure_directory(duckdb_temp_dir, "DuckDB temp")
+
+  # Use a stable, writable temp spill directory beside the DB file.
+  # This avoids reliance on OS temp paths that may be unavailable on some Windows setups.
+  duckdb_temp_dir_normalized <- normalizePath(duckdb_temp_dir, winslash = "/", mustWork = FALSE)
+
   matching_conn <- DBI::dbConnect(duckdb::duckdb(), dir_matching_db)
+  DBI::dbExecute(
+    matching_conn,
+    paste0(
+      "PRAGMA temp_directory='",
+      gsub("'", "''", duckdb_temp_dir_normalized, fixed = TRUE),
+      "';"
+    )
+  )
+  logger::log_info(paste0("[MATCHING] - DuckDB temp_directory set to: ", duckdb_temp_dir_normalized))
 
   if (matching_mode == "with_replacement") {
     D4_MSC <- match_cohorts_with_replacement(
@@ -282,11 +304,13 @@ build_study_cohort <- function(eligible_pop = NULL,
       col_T0 = output_column_names$col_T0
     )
   } else {
+    matching_query_nr <- gsub("__AGE_OFFSET__", as.character(as.integer(age_offset)), matching_query, fixed = TRUE)
+
     D4_MSC <- match_cohorts_without_replacement(
       matching_pop_groupkey = D3_MATCHING_POP,
       profile_table = D3_LOOKUP_TABLE,
       matching_vars = matching_vars,
-      matching_query = matching_query,
+      matching_query = matching_query_nr,
       matching_conn = matching_conn,
       save_output = FALSE,
       n_cores = n_cores,
@@ -297,7 +321,9 @@ build_study_cohort <- function(eligible_pop = NULL,
       col_age_iterator = input_column_names$col_age_iterator,
       col_match_id = output_column_names$col_match_id,
       col_treatment_group = output_column_names$col_treatment_group,
-      col_T0 = output_column_names$col_T0
+      col_T0 = output_column_names$col_T0,
+      exposed_batch_size = exposed_batch_size,
+      control_batch_size = control_batch_size
     )
   }
 
