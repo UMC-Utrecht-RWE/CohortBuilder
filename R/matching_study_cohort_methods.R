@@ -8,7 +8,7 @@
 #'
 #' @param object A data.table with class "matching_study_cohort".
 #' @noRd
-.log_matching_summary <- function(object) {
+.log_matching_summary <- function(object, col_person_id = "person_id") {
   if (!inherits(object, "data.table")) {
     object <- data.table::as.data.table(object)
   }
@@ -24,9 +24,9 @@
     invisible(NULL)
   }
 
-  required_cols <- c("group", "person_id")
+  required_cols <- c("group", col_person_id)
   if (!all(required_cols %in% names(object))) {
-    logger::log_info("[MATCHING] - Skipping cohort summary: 'group' or 'person_id' column not found.")
+    logger::log_info("[MATCHING] - Skipping cohort summary: 'group' or '", col_person_id,  "' column not found.")
     return(invisible(NULL))
   }
 
@@ -50,7 +50,7 @@
   controls <- object[group == "CONTROL"]
 
   if (nrow(controls) > 0L) {
-    control_usage <- controls[, .(N_used = .N), by = .(person_id)]
+    control_usage <- controls[, .(N_used = .N), by = get(col_person_id)]
     control_usage_dist <- control_usage[
       ,
       .(
@@ -100,13 +100,15 @@ summary.matching_study_cohort <- function(object, ...) {
     object <- data.table::as.data.table(object)
   }
 
-  required_cols <- c("group", "person_id")
+  required_cols <- c("group", col_person_id)
   missing_cols <- setdiff(required_cols, names(object))
   if (length(missing_cols) > 0L) {
     stop(
       "Missing required columns: ",
       paste(missing_cols, collapse = ", "),
-      ". Expected 'group' and 'person_id' columns.",
+      ". Expected 'group' and '",
+      col_person_id,
+      " columns.",
       call. = FALSE
     )
   }
@@ -133,7 +135,7 @@ summary.matching_study_cohort <- function(object, ...) {
 
   control_usage_dist <- NULL
   if (nrow(controls) > 0L) {
-    control_usage <- controls[, .(N_used = .N), by = .(person_id)]
+    control_usage <- controls[, .(N_used = .N), by = get(col_person_id)]
     control_usage_dist <- control_usage[
       ,
       .(

@@ -28,6 +28,7 @@
 #'     \item{`save_output`}{Logical. If `TRUE`, saves the final matched cohort to disk. Default is `TRUE`.}
 #'     \item{`dir_output`}{Directory where the output file will be saved.}
 #'     \item{`output_file_name`}{The name of the output file (without extension). Default is `"D4_MSC"`.}
+#'     \item{`other_cols_to_save`}{Name of the columns other than matching variables and 'col_person_id' to be saved.}
 #'   }
 #' @param intermediate_output_pars A list of parameters for intermediate outputs:
 #'   \describe{
@@ -105,7 +106,8 @@ build_study_cohort <- function(eligible_pop = NULL,
                                output_pars = list(
                                  save_output = TRUE,
                                  dir_output = "outputs",
-                                 output_file_name = "D4_MSC"
+                                 output_file_name = "D4_MSC",
+                                 other_cols_to_save = NULL
                                ),
                                intermediate_output_pars = list(
                                  save_intermediate_outputs = TRUE,
@@ -327,27 +329,39 @@ build_study_cohort <- function(eligible_pop = NULL,
     logger::log_info("[MATCHING] - Removed existing database.")
   }
 
-  # Write cohort to disk (non-bootstrap runs only)
-  if (!bootstrap_pars$with_bootstrap && isTRUE(output_pars$save_output)) {
-    output_file_path <- file.path(
-      output_pars$dir_output,
-      paste0(output_pars$output_file_name, ".parquet")
-    )
-    logger::log_info(paste0("[MATCHING] - Saving ", output_file_path, " to disk..."))
-    arrow::write_parquet(D4_MSC, output_file_path)
-    logger::log_info(paste0("[MATCHING] - ", output_file_path, " saved to disk successfully."))
-  }
 
   # Log cohort summary (non-bootstrap runs only)
   if (!bootstrap_pars$with_bootstrap) {
     tryCatch(
-      .log_matching_summary(D4_MSC),
+      .log_matching_summary(D4_MSC, col_person_id = col_person_id),
       error = function(e) {
         logger::log_info(paste0("[MATCHING] - Could not log cohort summary: ", conditionMessage(e)))
       }
     )
   }
 
+  # Write cohort to disk (non-bootstrap runs only)
+  if (!bootstrap_pars$with_bootstrap && isTRUE(output_pars$save_output)) {
+    output_file_path <- file.path(
+      output_pars$dir_output,
+      paste0(output_pars$output_file_name, ".parquet")
+    )
+    
+    # Add other columns to be saved to the final table.
+    if(!is.null(other_cols_to_save)) {
+      add_cols <- c(other_cols_to_save, col_person_id)
+      D4_MSC <- merge(
+        unique(eligible_pop[, ..add_cols]), 
+        D4_MSC, 
+        by = col_person_id, all.y = TRUE)
+    }
+    
+    logger::log_info(paste0("[MATCHING] - Saving ", output_file_path, " to disk..."))
+    
+    arrow::write_parquet(D4_MSC, output_file_path)
+    logger::log_info(paste0("[MATCHING] - ", output_file_path, " saved to disk successfully."))
+  }
+  
   if (!bootstrap_pars$with_bootstrap) {
     return(D4_MSC)
   }

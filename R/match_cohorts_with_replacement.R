@@ -205,15 +205,15 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
       cat(sprintf("\r%-50s", "Sampling...."))
       # Sample unique person IDs with replacement for bootstrap iteration
       sampled_ids <- matching_pop_groupkey[
-        , .(person_id = unique(get(col_person_id)))
+        , .(id = unique(get(col_person_id)))
       ][
-        , .(person_id = sample(person_id, .N, replace = TRUE))
+        , .(id = sample(get(col_person_id), .N, replace = TRUE))
       ][
-        order(person_id)
+        order(id)
       ]
 
       # Build dynamic join condition using specified person_id column name
-      join_condition <- setNames("person_id", col_person_id)
+      join_condition <- setNames("id", col_person_id)
 
       cat(sprintf("\r%-50s", "Sampling back to the source population...."))
       # Join resampled person IDs back to get all their records
@@ -230,7 +230,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     }
 
     # Convert all matching variables to integer format for efficient SQL processing
-    sampled_df[, person_id_int := as.integer(factor(person_id))]
+    sampled_df[, id_int := as.integer(factor(get(col_person_id)))]
     sampled_df[, startdateINT := as.integer(as.Date(get(col_matching_status_start)) - as.Date("1970-01-01"))]
     sampled_df[, enddateINT := as.integer(as.Date(get(col_matching_status_end)) - as.Date("1970-01-01"))]
     sampled_df[, year_of_birth := as.integer(get(col_age_iterator))]
@@ -250,7 +250,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
 
     # Extract exposed population and assign random values for stochastic matching
     cat(sprintf("\r%-50s", "Selecting the exposed population...."))
-    exp_cols <- c("person_id", "person_id_int", "groupkey", "group", "startdateINT", "enddateINT", "year_of_birth")
+    exp_cols <- c(col_person_id, "id_int", "groupkey", "group", "startdateINT", "enddateINT", "year_of_birth")
     if (!is.null(col_date_match)) exp_cols <- c(exp_cols, paste0(col_date_match, "_int"))
     sampled_df_Exp <- sampled_df[group == "exposed", exp_cols, with = FALSE]
     sampled_df_Exp[, random := runif(.N, min = 0, max = 10)]
@@ -258,7 +258,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
 
     # Extract control population and assign random values for stochastic matching
     cat(sprintf("\r%-50s", "Selecting the unexposed population...."))
-    un_cols <- c("person_id", "groupkey", "group", "startdateINT", "enddateINT", "year_of_birth")
+    un_cols <- c(col_person_id, "groupkey", "group", "startdateINT", "enddateINT", "year_of_birth")
     if (!is.null(col_date_match)) un_cols <- c(un_cols, paste0(col_date_match, "_int"))
     sampled_df_Un <- sampled_df[group == "control", un_cols, with = FALSE]
     sampled_df_Un[, random := runif(.N, min = 0, max = 10)]
@@ -438,15 +438,15 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
         if (length(vals) > 0L) vals[1L] else NA_integer_
       }
     ),
-    by = .(person_id = as.character(get(col_person_id)))
+    by = col_person_id
   ]
-  age_idx <- match(match_results_rebuilt_long[[col_person_id]], age_lookup$person_id)
+  
+  age_idx <- match(match_results_rebuilt_long[[col_person_id]], age_lookup[[col_person_id]])
   match_results_rebuilt_long[, (col_age_iterator) := age_lookup$age_value[age_idx]]
 
   # Retrieve original date columns for date matching if specified
   if (!is.null(col_date_match)) {
     pop_dt <- data.table::as.data.table(matching_pop_groupkey)
-    pid_col <- col_person_id
 
     for (date_col in col_date_match) {
       # For each matched person, find their date from the matching population
@@ -455,14 +455,28 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
       
       # Create lookup table from population data with unique person-spell-date combinations
       # Ensure person_id is character to match the original data types
+      # date_lookup <- unique(
+      #   pop_dt[, list(
+      #     (col_person_id) = as.character(get(pid_col)),
+      #     start = get(col_matching_status_start),
+      #     end = get(col_matching_status_end),
+      #     date_value = get(date_col)
+      #   )],
+      #   by = c(col_person_id, "start", "end")
+      # )
+      # 
+      
       date_lookup <- unique(
-        pop_dt[, list(
-          person_id = as.character(get(pid_col)),
-          start = get(col_matching_status_start),
-          end = get(col_matching_status_end),
-          date_value = get(date_col)
-        )],
-        by = c("person_id", "start", "end")
+        pop_dt[
+          ,
+          .(
+            start = get(col_matching_status_start),
+            end = get(col_matching_status_end),
+            date_value = get(date_col)
+          ),
+          by = col_person_id
+        ],
+        by = c(col_person_id, "start", "end")
       )
       
       # Merge with match results using the standard spell identifiers
@@ -471,7 +485,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
         match_results_rebuilt_long,
         date_lookup,
         by.x = c(col_person_id, col_matching_status_start, col_matching_status_end),
-        by.y = c("person_id", "start", "end"),
+        by.y = c(col_person_id, "start", "end"),
         all.x = TRUE
       )
       
