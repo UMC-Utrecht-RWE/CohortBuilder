@@ -348,8 +348,8 @@ build_study_cohort <- function(eligible_pop = NULL,
     )
     
     # Add other columns to be saved to the final table.
-    if(!is.null(other_cols_to_save)) {
-      add_cols <- c(other_cols_to_save, col_person_id)
+    if(!is.null(output_pars$other_cols_to_save)) {
+      add_cols <- c(output_pars$other_cols_to_save, col_person_id)
       D4_MSC <- merge(
         unique(eligible_pop[, ..add_cols]), 
         D4_MSC, 
