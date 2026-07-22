@@ -225,6 +225,13 @@ build_study_cohort <- function(eligible_pop = NULL,
     get(input_column_names$col_eligible_exposed) == TRUE | get(input_column_names$col_eligible_control) == TRUE
   ]
 
+  logger::log_info(paste("size of eligible population;", nrow(eligible_pop), "exposed: ",
+                         nrow(eligible_pop[get(input_column_names$col_eligible_exposed) == TRUE]),
+                         "control: ",
+                         nrow(eligible_pop[get(input_column_names$col_eligible_control) == TRUE])
+                         )
+                   )
+
   D3_LOOKUP_TABLE <- get_profile_table(
     eligible_pop = eligible_pop,
     matching_vars = matching_vars,
@@ -232,6 +239,8 @@ build_study_cohort <- function(eligible_pop = NULL,
     output_dir = intermediate_output_pars$dir_intermediate_outputs,
     output_file = intermediate_output_pars$profile_table_name
   )
+
+  logger::log_info(paste(nrow(D3_LOOKUP_TABLE), "distinct profiles"))
 
   ##########################################
   #### Get eligible matching population ####
@@ -251,6 +260,16 @@ build_study_cohort <- function(eligible_pop = NULL,
     col_matching_status_end = input_column_names$col_matching_status_end,
     col_age_iterator = input_column_names$col_age_iterator
   )
+
+  logger::log_info(paste(
+    "D3_MATCHING_POP has ", nrow(D3_MATCHING_POP), "rows",
+    "exposed: ", nrow(D3_MATCHING_POP[group == "exposed"]),
+    "control: ", nrow(D3_MATCHING_POP[group == "control"])
+  ))
+
+  if(any(duplicated(D3_MATCHING_POP[group == "exposed", person_id]))){
+    logger::log_info(paste("WARNING: D3_MATCHING_POP has duplicated exposed"))
+  }
 
   ###########################################
   #### Match with optional bootstrapping ####
@@ -299,6 +318,17 @@ build_study_cohort <- function(eligible_pop = NULL,
       col_treatment_group = output_column_names$col_treatment_group,
       col_T0 = output_column_names$col_T0
     )
+  }
+
+  logger::log_info(paste(
+    "D4_MSC has ", nrow(D4_MSC), "rows",
+    "exposed matched: ", nrow(D4_MSC[group == "EXPOSED"]),
+    "exposed unmatched: ", nrow(D4_MSC[group == "CONTROL"]),
+    "control: ", nrow(D4_MSC[group == "CONTROL"])
+  ))
+
+  if(any(duplicated(D4_MSC[group == "exposed", person_id]))){
+    logger::log_info(paste("WARNING: D4_MSC has duplicated exposed"))
   }
 
   DBI::dbDisconnect(matching_conn, shutdown = TRUE)
