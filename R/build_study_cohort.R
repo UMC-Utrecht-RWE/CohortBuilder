@@ -323,7 +323,7 @@ build_study_cohort <- function(eligible_pop = NULL,
   logger::log_info(paste(
     "D4_MSC has ", nrow(D4_MSC), "rows",
     "exposed matched: ", nrow(D4_MSC[group == "EXPOSED"]),
-    "exposed unmatched: ", nrow(D4_MSC[group == "CONTROL"]),
+    "exposed unmatched: ", nrow(D4_MSC[group == "UNMATCHED"]),
     "control: ", nrow(D4_MSC[group == "CONTROL"])
   ))
 

@@ -1,6 +1,6 @@
 Package: CohortBuilder
 Title: Bootstrap SQL-Based Matched Study Cohort Builder
-Version: 0.1.1
+Version: 0.1.2.1
 Authors@R:
     c(
     person("Sebastian", "Mildiner Moraga",
