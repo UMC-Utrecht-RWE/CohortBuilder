@@ -138,7 +138,8 @@ build_study_cohort <- function(eligible_pop = NULL,
                                age_offset = 1,
                                date_match_pars = list(
                                  col_date_match = NULL,
-                                 date_match_offsets = NULL
+                                 date_match_offsets = NULL,
+                                 range_match = NULL
                                ),
                                matching_mode = "with_replacement") {
   #########################################
@@ -296,7 +297,8 @@ build_study_cohort <- function(eligible_pop = NULL,
       col_treatment_group = output_column_names$col_treatment_group,
       col_T0 = output_column_names$col_T0,
       col_date_match = date_match_pars$col_date_match,
-      date_match_offsets = date_match_pars$date_match_offsets
+      date_match_offsets = date_match_pars$date_match_offsets,
+      range_match = date_match_pars$range_matched
     )
   } else {
     D4_MSC <- match_cohorts_without_replacement(
@@ -346,22 +348,22 @@ build_study_cohort <- function(eligible_pop = NULL,
       output_pars$dir_output,
       paste0(output_pars$output_file_name, ".parquet")
     )
-    
+
     # Add other columns to be saved to the final table.
     if(!is.null(output_pars$other_cols_to_save)) {
       add_cols <- c(output_pars$other_cols_to_save, col_person_id)
       D4_MSC <- merge(
-        unique(eligible_pop[, ..add_cols]), 
-        D4_MSC, 
+        unique(eligible_pop[, ..add_cols]),
+        D4_MSC,
         by = col_person_id, all.y = TRUE)
     }
-    
+
     logger::log_info(paste0("[MATCHING] - Saving ", output_file_path, " to disk..."))
-    
+
     arrow::write_parquet(D4_MSC, output_file_path)
     logger::log_info(paste0("[MATCHING] - ", output_file_path, " saved to disk successfully."))
   }
-  
+
   if (!bootstrap_pars$with_bootstrap) {
     return(D4_MSC)
   }
