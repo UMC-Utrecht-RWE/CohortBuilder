@@ -75,7 +75,8 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
                                            col_age_iterator = "year_of_birth",
                                            age_offset = 1,
                                            col_date_match = NULL,
-                                           date_match_offsets = NULL) {
+                                           date_match_offsets = NULL,
+                                           range_match = FALSE) {
   if (is.numeric(age_offset)) {
     msg <- paste("Matching based on profile and", col_age_iterator, "exposed between", col_age_iterator, "+/-", age_offset)
     logger::log_info(paste0("[MATCHING] - ", msg))
@@ -166,6 +167,32 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     logger::log_info(paste0("[MATCHING] - Date range matching enabled for: ", paste(col_date_match, collapse = ", ")))
   }
 
+
+  # Build dynamic SQL spell offset matching conditions
+  spell_offset_sql_conditions <- ""
+  if (range_match == TRUE) {
+    spell_conditions <- character()
+
+    # Original condition: exact spell match
+    spell_conditions <- c(spell_conditions, "E.startdateINT BETWEEN U.startdateINT AND U.enddateINT")
+
+    # Exposed start + offset
+    spell_conditions <- c(spell_conditions,
+                          paste0("E.startdateINT + ", date_match_offsets, " BETWEEN U.startdateINT AND U.enddateINT")
+    )
+
+    # Exposed start - offset
+    spell_conditions <- c(spell_conditions,
+                          paste0("E.startdateINT - ", date_match_offsets, " BETWEEN U.startdateINT AND U.enddateINT")
+    )
+
+    # FIX: Add OR between conditions
+    spell_offset_sql_conditions <- paste("(", paste(spell_conditions, collapse = "\n            OR "), ")")
+    logger::log_info(paste0("[MATCHING] - Spell offset matching enabled with offset: ", date_match_offsets, " days"))
+  } else {
+    # No offset: just the basic spell match
+    spell_offset_sql_conditions <- "E.startdateINT BETWEEN U.startdateINT AND U.enddateINT"
+  }
 
   # Set DuckDB thread configuration
   DBI::dbExecute(matching_conn, paste0("PRAGMA threads=", n_cores, ";"))
@@ -440,7 +467,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     ),
     by = col_person_id
   ]
-  
+
   age_idx <- match(match_results_rebuilt_long[[col_person_id]], age_lookup[[col_person_id]])
   match_results_rebuilt_long[, (col_age_iterator) := age_lookup$age_value[age_idx]]
 
@@ -452,7 +479,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
       # For each matched person, find their date from the matching population
       # by matching on person_id + matching status dates (which define the spell)
       # This ensures we get the date for the SPECIFIC SPELL that was matched, not just any spell for that person
-      
+
       # Create lookup table from population data with unique person-spell-date combinations
       # Ensure person_id is character to match the original data types
       # date_lookup <- unique(
@@ -464,8 +491,8 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
       #   )],
       #   by = c(col_person_id, "start", "end")
       # )
-      # 
-      
+      #
+
       date_lookup <- unique(
         pop_dt[
           ,
@@ -478,7 +505,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
         ],
         by = c(col_person_id, "start", "end")
       )
-      
+
       # Merge with match results using the standard spell identifiers
       # All matches should have matching start/end dates from the exposed population
       match_results_rebuilt_long <- merge(
@@ -488,7 +515,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
         by.y = c(col_person_id, "start", "end"),
         all.x = TRUE
       )
-      
+
       # Rename the merged date_value column to the original date column name
       data.table::setnames(match_results_rebuilt_long, "date_value", date_col)
     }

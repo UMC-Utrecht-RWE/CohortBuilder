@@ -32,7 +32,7 @@ WITH
             E.match_id,
             U.person_id AS idun
             -- Here we calculate the lowest absolute difference of the two random numbers
-            -- We will select the row with the lowest RandomDiff 
+            -- We will select the row with the lowest RandomDiff
 ,
             ABS(E.random - U.random) AS RandomDiff,
             U.startdateINT AS startdateINT_unexposed,
@@ -42,7 +42,7 @@ WITH
             INNER JOIN dfunORD U
             -- Join (match) the exposed to the unexposed based on the groupkey (profile) and the spell periods (start exposed between start and end unexposed)
             ON E.groupkey = U.groupkey
-            AND E.startdateINT BETWEEN U.startdateINT AND U.enddateINT
+            -- {{SPELL_OFFSET_CONDITIONS}}
             -- {{DATE_MATCH_CONDITIONS}}
     ),
     least AS (
