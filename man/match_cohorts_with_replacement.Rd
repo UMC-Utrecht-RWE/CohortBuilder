@@ -28,7 +28,8 @@ match_cohorts_with_replacement(
   col_age_iterator = "year_of_birth",
   age_offset = 1,
   col_date_match = NULL,
-  date_match_offsets = NULL
+  date_match_offsets = NULL,
+  range_match = NULL
 )
 }
 \arguments{

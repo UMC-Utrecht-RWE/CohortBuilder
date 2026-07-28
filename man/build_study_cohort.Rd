@@ -16,7 +16,7 @@ build_study_cohort(
   n_cores = NULL,
   log_name = "log_build_study_cohort",
   output_pars = list(save_output = TRUE, dir_output = "outputs", output_file_name =
-    "D4_MSC"),
+    "D4_MSC", other_cols_to_save = NULL),
   intermediate_output_pars = list(save_intermediate_outputs = TRUE,
     dir_intermediate_outputs = "intermediate_outputs", profile_table_name =
     "D3_LOOKUP_TABLE", matching_pop_name = "D3_MATCHING_POP"),
@@ -29,7 +29,8 @@ build_study_cohort(
   output_column_names = list(col_person_id = "person_id", col_match_id = "match_id",
     col_treatment_group = "group", col_T0 = "T0"),
   age_offset = 1,
-  date_match_pars = list(col_date_match = NULL, date_match_offsets = NULL),
+  date_match_pars = list(col_date_match = NULL, date_match_offsets = NULL, range_match =
+    NULL),
   matching_mode = "with_replacement"
 )
 }
@@ -60,6 +61,7 @@ which uses all available cores minus one.}
 \item{\code{save_output}}{Logical. If \code{TRUE}, saves the final matched cohort to disk. Default is \code{TRUE}.}
 \item{\code{dir_output}}{Directory where the output file will be saved.}
 \item{\code{output_file_name}}{The name of the output file (without extension). Default is \code{"D4_MSC"}.}
+\item{\code{other_cols_to_save}}{Name of the columns other than matching variables and 'col_person_id' to be saved.}
 }}
 
 \item{intermediate_output_pars}{A list of parameters for intermediate outputs:

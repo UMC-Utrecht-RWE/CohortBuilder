@@ -42,8 +42,7 @@ WITH
             INNER JOIN dfunORD U
             -- Join (match) the exposed to the unexposed based on the groupkey (profile) and the spell periods (start exposed between start and end unexposed)
             ON E.groupkey = U.groupkey
-            -- {{SPELL_OFFSET_CONDITIONS}}
-            -- {{DATE_MATCH_CONDITIONS}}
+            -- {{RANGE_MATCH_CONDITIONS}}
     ),
     least AS (
         -- Here we're going to select the row with the lowest RandomDiff per match_id

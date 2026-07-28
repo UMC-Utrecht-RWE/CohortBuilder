@@ -169,29 +169,28 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
 
 
   # Build dynamic SQL spell offset matching conditions
-  spell_offset_sql_conditions <- ""
+  range_match_sql_conditions <- ""
   if (range_match == TRUE) {
-    spell_conditions <- character()
+    range_conditions <- character()
 
     # Original condition: exact spell match
-    spell_conditions <- c(spell_conditions, "E.startdateINT BETWEEN U.startdateINT AND U.enddateINT")
+    range_conditions <- c(range_conditions, "E.startdateINT BETWEEN U.startdateINT AND U.enddateINT")
 
     # Exposed start + offset
-    spell_conditions <- c(spell_conditions,
-                          paste0("E.startdateINT + ", date_match_offsets, " BETWEEN U.startdateINT AND U.enddateINT")
-    )
+    range_conditions <- c(range_conditions,
+                          "E.startdateINT BETWEEN U.startdateINT_lb AND U.enddateINT_lb")
+
 
     # Exposed start - offset
-    spell_conditions <- c(spell_conditions,
-                          paste0("E.startdateINT - ", date_match_offsets, " BETWEEN U.startdateINT AND U.enddateINT")
-    )
+    range_conditions <- c(range_conditions,
+                          "E.startdateINT BETWEEN U.startdateINT_ub AND U.enddateINT_ub")
 
     # FIX: Add OR between conditions
-    spell_offset_sql_conditions <- paste("(", paste(spell_conditions, collapse = "\n            OR "), ")")
+    range_match_sql_conditions <- paste("AND(", paste(range_conditions, collapse = "\n            OR "), ")")
     logger::log_info(paste0("[MATCHING] - Spell offset matching enabled with offset: ", date_match_offsets, " days"))
   } else {
     # No offset: just the basic spell match
-    spell_offset_sql_conditions <- "E.startdateINT BETWEEN U.startdateINT AND U.enddateINT"
+    range_match_sql_conditions <- "AND E.startdateINT BETWEEN U.startdateINT AND U.enddateINT"
   }
 
   # Set DuckDB thread configuration
@@ -260,6 +259,17 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     sampled_df[, id_int := as.integer(factor(get(col_person_id)))]
     sampled_df[, startdateINT := as.integer(as.Date(get(col_matching_status_start)) - as.Date("1970-01-01"))]
     sampled_df[, enddateINT := as.integer(as.Date(get(col_matching_status_end)) - as.Date("1970-01-01"))]
+    # Also calcualte additional windows to prepare range matching
+    sampled_df[group == "control",
+               startdateINT_lb := startdateINT - date_match_offsets]
+    sampled_df[group == "control",
+               enddateINT_lb := enddateINT - date_match_offsets]
+
+    sampled_df[group == "control",
+               startdateINT_ub := startdateINT + date_match_offsets]
+    sampled_df[group == "control",
+               enddateINT_ub := enddateINT + date_match_offsets]
+
     sampled_df[, year_of_birth := as.integer(get(col_age_iterator))]
     sampled_df[, groupkey := as.integer(groupkey)]
 
@@ -277,16 +287,24 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
 
     # Extract exposed population and assign random values for stochastic matching
     cat(sprintf("\r%-50s", "Selecting the exposed population...."))
-    exp_cols <- c(col_person_id, "id_int", "groupkey", "group", "startdateINT", "enddateINT", "year_of_birth")
-    if (!is.null(col_date_match)) exp_cols <- c(exp_cols, paste0(col_date_match, "_int"))
+    exp_cols <- c(col_person_id, "id_int", "groupkey", "group",
+                  "startdateINT","enddateINT",
+                  "startdateINT_lb","enddateINT_lb",
+                  "startdateINT_ub","enddateINT_ub",
+                  "year_of_birth")
+    #if (!is.null(col_date_match)) exp_cols <- c(exp_cols, paste0(col_date_match, "_int"))
     sampled_df_Exp <- sampled_df[group == "exposed", exp_cols, with = FALSE]
     sampled_df_Exp[, random := runif(.N, min = 0, max = 10)]
     sampled_df_Exp[, match_id := .I]
 
     # Extract control population and assign random values for stochastic matching
     cat(sprintf("\r%-50s", "Selecting the unexposed population...."))
-    un_cols <- c(col_person_id, "groupkey", "group", "startdateINT", "enddateINT", "year_of_birth")
-    if (!is.null(col_date_match)) un_cols <- c(un_cols, paste0(col_date_match, "_int"))
+    un_cols <- c(col_person_id, "groupkey", "group",
+                 "startdateINT", "enddateINT",
+                 "startdateINT_lb","enddateINT_lb",
+                 "startdateINT_ub","enddateINT_ub",
+                 "year_of_birth")
+    #if (!is.null(col_date_match)) un_cols <- c(un_cols, paste0(col_date_match, "_int"))
     sampled_df_Un <- sampled_df[group == "control", un_cols, with = FALSE]
     sampled_df_Un[, random := runif(.N, min = 0, max = 10)]
 
@@ -335,16 +353,16 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
       # Add date range matching conditions to the query
       # Handle both -- and /* */ comment styles around the placeholder (formatters may convert between them)
       matching_query_adjusted <- gsub(
-        "(?:--|/\\*)\\s*\\{\\{DATE_MATCH_CONDITIONS\\}\\}(?:\\s*\\*/)?",
-        date_match_sql_conditions,
+        "(?:--|/\\*)\\s*\\{\\{RANGE_MATCH_CONDITIONS\\}\\}(?:\\s*\\*/)?",
+        range_match_sql_conditions,
         matching_query_adjusted,
         perl = TRUE
       )
 
       # DEBUG: Check if placeholder was substituted
-      if (!is.null(col_date_match) && grepl("DATE_MATCH_CONDITIONS", matching_query_adjusted)) {
+      if (!is.null(col_date_match) && grepl("RANGE_MATCH_CONDITIONS", matching_query_adjusted)) {
         logger::log_warn(paste0("[MATCHING] - WARNING: Date match placeholder was not substituted for year ", year))
-        logger::log_debug(paste0("[MATCHING] - Date conditions to inject:\n", date_match_sql_conditions))
+        logger::log_debug(paste0("[MATCHING] - Date conditions to inject:\n", range_match_sql_conditions))
       } else if (!is.null(col_date_match)) {
         logger::log_debug(paste0("[MATCHING] - Date match conditions injected for year ", year))
       }
