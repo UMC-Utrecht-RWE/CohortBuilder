@@ -298,7 +298,7 @@ build_study_cohort <- function(eligible_pop = NULL,
       col_T0 = output_column_names$col_T0,
       col_date_match = date_match_pars$col_date_match,
       date_match_offsets = date_match_pars$date_match_offsets,
-      range_match = date_match_pars$range_matched
+      range_match = date_match_pars$range_match
     )
   } else {
     D4_MSC <- match_cohorts_without_replacement(

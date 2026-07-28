@@ -8,7 +8,7 @@
 #' @param query A query argument to validate.
 #'
 #' @return Logical scalar indicating whether `query` should be treated as empty.
-#'
+#' @export
 #' @keywords internal
 #' @noRd
 is_empty_query <- function(query) {

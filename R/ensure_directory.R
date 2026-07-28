@@ -1,6 +1,7 @@
 # Internal directory helper -----------------------------------------------
-
-# Create a directory if it is missing and log the action.
+#' Create a directory if it is missing and log the action.
+#' @export
+#'
 .ensure_directory <- function(path = NULL, label = "output") {
   if (is.null(path) || !nzchar(path)) {
     return(invisible(NULL))
