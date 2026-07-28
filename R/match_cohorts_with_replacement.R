@@ -76,7 +76,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
                                            age_offset = 1,
                                            col_date_match = NULL,
                                            date_match_offsets = NULL,
-                                           range_match = FALSE) {
+                                           range_match = NULL) {
   if (is.numeric(age_offset)) {
     msg <- paste("Matching based on profile and", col_age_iterator, "exposed between", col_age_iterator, "+/-", age_offset)
     logger::log_info(paste0("[MATCHING] - ", msg))
