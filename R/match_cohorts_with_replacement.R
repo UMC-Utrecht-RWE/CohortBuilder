@@ -282,6 +282,47 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
   match_results <- DBI::dbReadTable(matching_conn, "match_result")
   data.table::setDT(match_results)
 
+  # check for duplicates
+  repeat_summary <- match_results[
+    boot_id == 0,
+    .N,
+    by = idexp
+  ][
+    N > 1,
+    .N,
+    by = .(times_repeated = N)
+  ][
+    order(times_repeated)
+  ]
+
+  logger::log_info("boot_id = 0 duplicate idexp summary:")
+
+  if (nrow(repeat_summary) == 0) {
+    logger::log_info("  No repeated idexp values found.")
+  } else {
+    for (i in seq_len(nrow(repeat_summary))) {
+      logger::log_info(
+        "  {repeat_summary$N[i]} idexp values are repeated {repeat_summary$times_repeated[i]} times."
+      )
+    }
+  }
+
+  logger::log_info(
+    "Rows belonging to repeated idexp values: {match_results[
+    boot_id == 0,
+    .N,
+    by = idexp
+  ][N > 1, sum(N)]}"
+  )
+
+  logger::log_info(
+    "Rows with unique (non-repeated) idexp values: {match_results[
+    boot_id == 0,
+    .N,
+    by = idexp
+  ][N == 1, sum(N)]}"
+  )
+
   # Convert integer date encoding back to calendar dates
   origin_date <- as.Date("1970-01-01")
 
