@@ -171,23 +171,11 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
   # Build dynamic SQL spell offset matching conditions
   range_match_sql_conditions <- ""
   if (range_match == TRUE) {
-    range_conditions <- character()
 
     # Original condition: exact spell match
-    range_conditions <- c(range_conditions, "E.startdateINT BETWEEN U.startdateINT AND U.enddateINT")
+    range_match_sql_conditions <- "AND E.startdateINT BETWEEN U.startdateINT_ext AND U.enddateINT_ext"
+    logger::log_info(paste0("[MATCHING] - Range matching enabled with offset: ", date_match_offsets, " days"))
 
-    # Exposed start + offset
-    range_conditions <- c(range_conditions,
-                          "E.startdateINT BETWEEN U.startdateINT_lb AND U.enddateINT_lb")
-
-
-    # Exposed start - offset
-    range_conditions <- c(range_conditions,
-                          "E.startdateINT BETWEEN U.startdateINT_ub AND U.enddateINT_ub")
-
-    # FIX: Add OR between conditions
-    range_match_sql_conditions <- paste("AND(", paste(range_conditions, collapse = "\n            OR "), ")")
-    logger::log_info(paste0("[MATCHING] - Spell offset matching enabled with offset: ", date_match_offsets, " days"))
   } else {
     # No offset: just the basic spell match
     range_match_sql_conditions <- "AND E.startdateINT BETWEEN U.startdateINT AND U.enddateINT"
@@ -261,14 +249,9 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     sampled_df[, enddateINT := as.integer(as.Date(get(col_matching_status_end)) - as.Date("1970-01-01"))]
     # Also calcualte additional windows to prepare range matching
     sampled_df[group == "control",
-               startdateINT_lb := startdateINT - date_match_offsets]
+               startdateINT_ext := startdateINT - date_match_offsets]
     sampled_df[group == "control",
-               enddateINT_lb := enddateINT - date_match_offsets]
-
-    sampled_df[group == "control",
-               startdateINT_ub := startdateINT + date_match_offsets]
-    sampled_df[group == "control",
-               enddateINT_ub := enddateINT + date_match_offsets]
+               enddateINT_ext := enddateINT + date_match_offsets]
 
     sampled_df[, year_of_birth := as.integer(get(col_age_iterator))]
     sampled_df[, groupkey := as.integer(groupkey)]
@@ -289,8 +272,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     cat(sprintf("\r%-50s", "Selecting the exposed population...."))
     exp_cols <- c(col_person_id, "id_int", "groupkey", "group",
                   "startdateINT","enddateINT",
-                  "startdateINT_lb","enddateINT_lb",
-                  "startdateINT_ub","enddateINT_ub",
+                  "startdateINT_ext","enddateINT_ext",
                   "year_of_birth")
     #if (!is.null(col_date_match)) exp_cols <- c(exp_cols, paste0(col_date_match, "_int"))
     sampled_df_Exp <- sampled_df[group == "exposed", exp_cols, with = FALSE]
@@ -301,8 +283,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     cat(sprintf("\r%-50s", "Selecting the unexposed population...."))
     un_cols <- c(col_person_id, "groupkey", "group",
                  "startdateINT", "enddateINT",
-                 "startdateINT_lb","enddateINT_lb",
-                 "startdateINT_ub","enddateINT_ub",
+                 "startdateINT_ext","enddateINT_ext",
                  "year_of_birth")
     #if (!is.null(col_date_match)) un_cols <- c(un_cols, paste0(col_date_match, "_int"))
     sampled_df_Un <- sampled_df[group == "control", un_cols, with = FALSE]
