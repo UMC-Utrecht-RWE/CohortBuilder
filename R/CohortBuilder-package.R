@@ -11,5 +11,5 @@
 #' @import data.table
 "_PACKAGE"
 
-#' @importFrom stats rpois runif setNames
+#' @importFrom stats rpois setNames
 "_PACKAGE"

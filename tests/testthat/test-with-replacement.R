@@ -163,3 +163,23 @@ test_that("if age_offset = NULL, year_of_birth values can vary within each pair"
     label = "year_of_birth can vary within each pair when age_offset is NULL"
   )
 })
+
+# ---- reproducibility ---------------------------------------------------------
+
+# Reduce the exposed<->control pairing of a D4 cohort to a match_id-independent
+# key so two runs can be compared regardless of row/match_id ordering.
+extract_pairs <- function(d4) {
+  exposed <- d4[group %chin% c("EXPOSED", "UNMATCHED"), .(match_id, exposed_id = person_id)]
+  control <- d4[group == "CONTROL", .(match_id, control_id = person_id)]
+  pairs <- merge(exposed, control, by = "match_id", all.x = TRUE)
+  pairs[order(exposed_id), .(exposed_id, control_id)]
+}
+
+test_that("with-replacement matching is reproducible across repeated runs with the same seed", {
+  # Matching randomness is derived from a deterministic hash of (spell_id, replicate_idx,
+  # seed) computed in SQL, so re-running with the same inputs/seed should give identical pairs.
+  res1 <- run_pipeline(d3, seed = 123L)
+  res2 <- run_pipeline(d3, seed = 123L)
+
+  expect_identical(extract_pairs(res1$d4), extract_pairs(res2$d4))
+})
