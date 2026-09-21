@@ -56,6 +56,7 @@ utils::globalVariables(c(
   "prior_bivalent",
   "random",
   "receives_any_covidvaccine",
+  "replicate_idx",
   "receives_bivalent",
   "receives_first_bivalent",
   "spell_id",
