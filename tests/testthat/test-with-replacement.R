@@ -183,3 +183,15 @@ test_that("with-replacement matching is reproducible across repeated runs with t
 
   expect_identical(extract_pairs(res1$d4), extract_pairs(res2$d4))
 })
+
+test_that("match_id is reproducible across repeated runs with the same seed", {
+  # match_id is assigned after ordering by exposed person_id and T0, so it no longer
+  # depends on DB read/insert order and should be identical across runs.
+  res1 <- run_pipeline(d3, seed = 123L)
+  res2 <- run_pipeline(d3, seed = 123L)
+
+  ordered1 <- res1$d4[order(person_id, group), .(person_id, group, match_id)]
+  ordered2 <- res2$d4[order(person_id, group), .(person_id, group, match_id)]
+
+  expect_identical(ordered1, ordered2)
+})

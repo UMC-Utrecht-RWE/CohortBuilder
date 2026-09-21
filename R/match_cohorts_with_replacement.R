@@ -299,7 +299,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
   # Convert integer date encoding back to calendar dates
   origin_date <- as.Date("1970-01-01")
 
-  # Join results with profile table and decode dates, assign match IDs
+  # Join results with profile table and decode dates
   match_results_rebuilt <- match_results[
     profile_table,
     on = "groupkey",
@@ -311,10 +311,16 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
       startdate_exposed   = startdateINT_exposed + origin_date,
       startdate_unexposed = startdateINT_unexposed + origin_date,
       enddate_exposed     = enddateINT_exposed + origin_date,
-      enddate_unexposed   = enddateINT_unexposed + origin_date,
-      match_id            = .I
+      enddate_unexposed   = enddateINT_unexposed + origin_date
     )
-  ][
+  ]
+
+  # Order by exposed person and index date before assigning match_id, so the final
+  # match_id is reproducible across runs regardless of DB read/insert order
+  data.table::setorder(match_results_rebuilt, idexp, T0)
+  match_results_rebuilt[, match_id := .I]
+
+  match_results_rebuilt <- match_results_rebuilt[
     ,
     !c(
       "groupkey",
