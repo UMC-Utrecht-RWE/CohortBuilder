@@ -169,10 +169,10 @@ test_that("if age_offset = NULL, year_of_birth values can vary within each pair"
 # Reduce the exposed<->control pairing of a D4 cohort to a match_id-independent
 # key so two runs can be compared regardless of row/match_id ordering.
 extract_pairs <- function(d4) {
-  exposed <- d4[group %chin% c("EXPOSED", "UNMATCHED"), .(match_id, exposed_id = person_id)]
+  exposed <- d4[group %chin% c("EXPOSED", "UNMATCHED"), .(match_id, T0, exposed_id = person_id)]
   control <- d4[group == "CONTROL", .(match_id, control_id = person_id)]
   pairs <- merge(exposed, control, by = "match_id", all.x = TRUE)
-  pairs[order(exposed_id), .(exposed_id, control_id)]
+  pairs[order(exposed_id, T0), .(exposed_id, control_id, T0)]
 }
 
 test_that("with-replacement matching is reproducible across repeated runs with the same seed", {
