@@ -1,7 +1,7 @@
 # pkgdown site settings: https://pkgdown.r-lib.org/articles/pkgdown.html
 # Replace PACKAGE with the repository name, and add the same URL to the
 # `URL:` field in DESCRIPTION. CI builds the site and deploys it to gh-pages.
-url: https://umc-utrecht-rwe.github.io/PACKAGE/
+url: https://umc-utrecht-rwe.github.io/CohortBuilder/
 
 template:
   bootstrap: 5
