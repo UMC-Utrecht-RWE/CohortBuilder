@@ -124,6 +124,12 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
   # Initialize matching target table for storing results
   DBI::dbExecute(matching_conn, target_table_query)
 
+  # Assign a stable, content-derived spell identifier (independent of the row order the
+  # caller happens to supply) so that matching randomness can be reproduced deterministically
+  matching_pop_groupkey <- data.table::copy(data.table::as.data.table(matching_pop_groupkey))
+  data.table::setorderv(matching_pop_groupkey, c(col_person_id, col_matching_status_start, col_matching_status_end, "groupkey"))
+  matching_pop_groupkey[, spell_id := .I]
+
   # Override bootstrap iterations when bootstrapping is disabled
   if (!with_bootstrap) {
     if (is.null(n_bootstraps)) {
@@ -154,14 +160,19 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
       set.seed(start_seed + bootstrap)
 
       cat(sprintf("\r%-50s", "Sampling...."))
-      # Sample unique person IDs with replacement for bootstrap iteration
+      # Sample unique person IDs with replacement for bootstrap iteration.
+      # `sort()` makes the vector fed into `sample()` independent of the incoming row order.
       sampled_ids <- matching_pop_groupkey[
-        , .(person_id = unique(get(col_person_id)))
+        , .(person_id = sort(unique(get(col_person_id))))
       ][
         , .(person_id = sample(person_id, .N, replace = TRUE))
       ][
         order(person_id)
       ]
+
+      # Number repeated draws of the same person (1st, 2nd, ... time drawn) so each
+      # bootstrap copy of a person still gets its own deterministic hash downstream
+      sampled_ids[, replicate_idx := seq_len(.N), by = person_id]
 
       # Build dynamic join condition using specified person_id column name
       join_condition <- setNames("person_id", col_person_id)
@@ -175,7 +186,8 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     } else {
       # No bootstrap: use original population as-is for single iteration
       cat(sprintf("\r%-50s", "No resampling; the source population will be used...."))
-      sampled_df <- matching_pop_groupkey
+      sampled_df <- data.table::copy(matching_pop_groupkey)
+      sampled_df[, replicate_idx := 1L]
 
       gc()
     }
@@ -191,28 +203,26 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     min_year <- min(sampled_df$year_of_birth, na.rm = TRUE)
     max_year <- max(sampled_df$year_of_birth, na.rm = TRUE)
 
-    # Extract exposed population and assign random values for stochastic matching
+    # Extract exposed population; `spell_id`/`replicate_idx` drive deterministic hashing in SQL
     cat(sprintf("\r%-50s", "Selecting the exposed population...."))
     sampled_df_Exp <- sampled_df[
       group == "exposed",
       .(
         person_id, person_id_int, groupkey, group, get(col_matching_status_start), get(col_matching_status_end),
-        year_of_birth, startdateINT, enddateINT
+        year_of_birth, startdateINT, enddateINT, spell_id, replicate_idx
       )
     ]
-    sampled_df_Exp[, random := runif(.N, min = 0, max = 10)]
     sampled_df_Exp[, match_id := .I]
 
-    # Extract control population and assign random values for stochastic matching
+    # Extract control population; `spell_id`/`replicate_idx` drive deterministic hashing in SQL
     cat(sprintf("\r%-50s", "Selecting the unexposed population...."))
     sampled_df_Un <- sampled_df[
       group == "control",
       .(
         person_id, groupkey, group, get(col_matching_status_start), get(col_matching_status_end),
-        year_of_birth, startdateINT, enddateINT
+        year_of_birth, startdateINT, enddateINT, spell_id, replicate_idx
       )
     ]
-    sampled_df_Un[, random := runif(.N, min = 0, max = 10)]
 
     rm(sampled_df)
     gc()
@@ -231,6 +241,10 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
     rm(sampled_df_Exp, sampled_df_Un)
     gc()
 
+    # Substitute the deterministic hash seed for this bootstrap iteration (0 when not bootstrapping)
+    effective_seed <- as.integer(start_seed) + as.integer(bootstrap)
+    matching_query_seeded <- gsub("__START_SEED__", as.character(effective_seed), matching_query, fixed = TRUE)
+
     # Execute matching query for each year-of-birth stratum
     for (year in min_year:max_year) {
       cat(sprintf("\rDoing year_of_birth loops, %d%% ready....", round(((year - min_year) / (max_year - min_year)) * 100)))
@@ -239,7 +253,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
       matching_query_adjusted <- gsub(
         "year_of_birth = 1920",
         paste0("year_of_birth = ", year),
-        matching_query
+        matching_query_seeded
       )
       # Adjust age tolerance window for year-of-birth matching
       if (is.null(age_offset)) {
@@ -285,7 +299,7 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
   # Convert integer date encoding back to calendar dates
   origin_date <- as.Date("1970-01-01")
 
-  # Join results with profile table and decode dates, assign match IDs
+  # Join results with profile table and decode dates
   match_results_rebuilt <- match_results[
     profile_table,
     on = "groupkey",
@@ -297,10 +311,16 @@ match_cohorts_with_replacement <- function(matching_pop_groupkey = NULL,
       startdate_exposed   = startdateINT_exposed + origin_date,
       startdate_unexposed = startdateINT_unexposed + origin_date,
       enddate_exposed     = enddateINT_exposed + origin_date,
-      enddate_unexposed   = enddateINT_unexposed + origin_date,
-      match_id            = .I
+      enddate_unexposed   = enddateINT_unexposed + origin_date
     )
-  ][
+  ]
+
+  # Order by exposed person and index date before assigning match_id, so the final
+  # match_id is reproducible across runs regardless of DB read/insert order
+  data.table::setorder(match_results_rebuilt, idexp, T0)
+  match_results_rebuilt[, match_id := .I]
+
+  match_results_rebuilt <- match_results_rebuilt[
     ,
     !c(
       "groupkey",

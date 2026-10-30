@@ -9,7 +9,8 @@ generate_eligibility_data(
   start_seed = 42,
   save_output,
   output_dir,
-  output_file = "D3_ELIGIBILITY"
+  output_file = "D3_ELIGIBILITY",
+  n_spells = 2
 )
 }
 \arguments{
@@ -22,6 +23,8 @@ generate_eligibility_data(
 \item{output_dir}{Character. Directory where the dataset should be saved if \code{save_output} is TRUE.}
 
 \item{output_file}{Character. Name of the output file (without extension). Default is \code{"D3_ELIGIBILITY"}.}
+
+\item{n_spells}{Integer. Number of spells per person. Default is 2.}
 }
 \value{
 A data.table containing the generated synthetic dataset with detailed eligibility attributes.

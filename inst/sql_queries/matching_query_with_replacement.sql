@@ -7,7 +7,12 @@ WITH
             match_id,
             startdateINT,
             enddateINT,
-            random
+            -- Deterministic pseudo-random value: a pure function of the person's stable
+            -- spell_id, their bootstrap draw number, and the seed. Independent of row
+            -- order and safe under multi-threaded execution (unlike an R-side runif()).
+            CAST(
+                hash(spell_id, replicate_idx, __START_SEED__) AS HUGEINT
+            ) AS random
         FROM
             dfexp
         WHERE
@@ -24,7 +29,10 @@ WITH
             groupkey,
             startdateINT,
             enddateINT,
-            random
+            -- Same deterministic hashing scheme as dfexpORD, keyed off the control's own spell/draw
+            CAST(
+                hash(spell_id, replicate_idx, __START_SEED__) AS HUGEINT
+            ) AS random
         FROM
             dfun
         WHERE
@@ -53,32 +61,34 @@ WITH
             ON E.groupkey = U.groupkey
             AND E.startdateINT BETWEEN U.startdateINT AND U.enddateINT
     ),
-    least AS (
-        -- Here we're going to select the row with the lowest RandomDiff per match_id
+    ranked AS (
+        -- Rank candidate unexposed matches per match_id by RandomDiff, breaking any exact
+        -- ties deterministically on idun so exactly one winner is chosen regardless of
+        -- parallel execution order (mirrors the without-replacement matching query)
         SELECT
-            J.match_id,
-            MIN(J.RandomDiff) AS MinRandomDiff
+            J.*,
+            ROW_NUMBER() OVER (
+                PARTITION BY
+                    J.match_id
+                ORDER BY
+                    J.RandomDiff,
+                    J.idun
+            ) AS match_rank
         FROM
             joined J
-        GROUP BY
-            J.match_id
-        ORDER BY
-            J.match_id
     ),
     matched_persons AS (
         -- So which persons are this?
         SELECT
-            J.idexp,
-            J.idun,
-            J.match_id,
-            J.startdateINT_unexposed,
-            J.enddateINT_unexposed
+            idexp,
+            idun,
+            match_id,
+            startdateINT_unexposed,
+            enddateINT_unexposed
         FROM
-            joined J
-            INNER JOIN least L
-            -- Select only the combination with the smallest MinRandomDiff
-            ON L.match_id = J.match_id
-            AND L.MinRandomDiff = J.RandomDiff
+            ranked
+        WHERE
+            match_rank = 1
     )
     -- I want to have a resultset with the matched exposed and the unmatched
 INSERT INTO

@@ -14,6 +14,9 @@ match_cohorts_without_replacement(
   result_file = NULL,
   save_output = FALSE,
   n_cores = NULL,
+  exposed_batch_size = 50000L,
+  control_batch_count = 1L,
+  control_batch_size = NULL,
   start_seed = 42,
   col_person_id = "person_id",
   col_match_id = "match_id",
@@ -21,7 +24,8 @@ match_cohorts_without_replacement(
   col_T0 = "T0",
   col_matching_status_start = "matching_status_start",
   col_matching_status_end = "matching_status_end",
-  col_age_iterator = "year_of_birth"
+  col_age_iterator = "year_of_birth",
+  age_offset = 1L
 )
 }
 \arguments{
@@ -55,6 +59,22 @@ and execute the greedy candidate selection queries.}
 \item{n_cores}{Integer number of DuckDB threads to use. Defaults to all detected
 cores minus one.}
 
+\item{exposed_batch_size}{Integer cap on the number of exposed spells processed
+per SQL batch within each greedy round. Batching follows global exposed priority
+order to reduce memory pressure while preserving no-replacement behavior.
+Defaults to \code{50000}.}
+
+\item{control_batch_count}{Integer number of deterministic control hash buckets
+to scan per exposed batch. Values > 1 reduce peak join size by scanning
+controls in partitions and retaining the global best control candidate per
+exposed spell before collision resolution. Defaults to \code{1} (no control batching).}
+
+\item{control_batch_size}{Optional integer target number of available control
+spells per control batch. When provided, the function derives
+\code{control_batch_count = ceiling(n_available_controls / control_batch_size)}
+at the start of each round. This is ignored when the matching query does
+not support control-bucket placeholders.}
+
 \item{start_seed}{Integer seed used for deterministic tie-breaking in the greedy
 matching order and control selection.}
 
@@ -76,6 +96,11 @@ Default is \code{"matching_status_end"}.}
 
 \item{col_age_iterator}{Column name for the year-of-birth matching variable.
 Default is \code{"year_of_birth"}.}
+
+\item{age_offset}{Non-negative integer tolerance for year-of-birth matching.
+Controls candidate eligibility as control year of birth between exposed year
+of birth \code{- age_offset} and exposed year of birth \code{+ age_offset}.
+Default is \code{1}.}
 }
 \value{
 If \code{save_output = FALSE}, returns a data.table with one row per

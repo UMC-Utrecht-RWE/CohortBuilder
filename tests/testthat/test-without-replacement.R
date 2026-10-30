@@ -23,7 +23,7 @@ make_d3 <- function(n_spells = 2e5, seed = 42L) {
   )
 }
 
-run_pipeline <- function(d3, seed = 42L) {
+run_pipeline <- function(d3, seed = 42L, age_offset = 1) {
   matching_vars <- c(
     "SV_SEX", "SV_REGION", "SV_HIST_COVID_VACC", "SV_PRIOR_COVID_DG", "SV_BRAND_COVID_VACC",
     "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED", "CDC_RISK", "SV_SES_STATUS"
@@ -77,7 +77,8 @@ run_pipeline <- function(d3, seed = 42L) {
         col_treatment_group = "group",
         col_T0 = "T0"
       ),
-      matching_mode = "without_replacement"
+      matching_mode = "without_replacement",
+      age_offset = age_offset
     )
   )
 
@@ -163,4 +164,31 @@ test_that("matching variables are identical within each matched pair", {
       label = paste0("matching variable `", v, "` is equal within each pair")
     )
   }
+})
+
+test_that("matched pairs have the same year_of_birth if age_offset = 0", {
+  res <- run_pipeline(d3, seed = 42L, age_offset = 0)
+  matched <- res$d4[!is.na(match_id)]
+
+  if (nrow(matched) == 0L) skip("No matched pairs produced")
+
+  by_var <- matched[, .(n_unique = data.table::uniqueN(year_of_birth)), by = match_id]
+  expect_true(
+    by_var[, all(n_unique == 1L)],
+    label = "year_of_birth is equal within each pair"
+  )
+})
+
+test_that("matched pairs have year_of_birth within age_offset if age_offset > 0", {
+  age_offset <- 10
+  res <- run_pipeline(d3, seed = 42L, age_offset = age_offset)
+  matched <- res$d4[!is.na(match_id)]
+
+  if (nrow(matched) == 0L) skip("No matched pairs produced")
+
+  by_var <- matched[, .(min_yob = min(year_of_birth), max_yob = max(year_of_birth)), by = match_id]
+  expect_true(
+    by_var[, all((max_yob - min_yob) <= age_offset)],
+    label = paste0("year_of_birth is within age_offset of ", age_offset, " within each pair")
+  )
 })
