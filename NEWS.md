@@ -11,7 +11,7 @@ How:
 - At release, rename "(development version)" to the version number, e.g. "# PACKAGE 1.2.0", and start a new "(development version)" block above it.
 -->
 
-# PACKAGE (development version)
+# CohortBuilder (development version)
 
 ## Added
 
