@@ -109,13 +109,11 @@ test_that("set_matching_environment handles non-existent database gracefully", {
   })
 
   # Should not error when database doesn't exist
-  suppressMessages(
-    suppressWarnings(
-      set_matching_environment(
-        eligible_pop = eligible_pop,
-        matching_query = matching_query,
-        dir_matching_db = db_path
-      )
+  expect_silent(
+    set_matching_environment(
+      eligible_pop = eligible_pop,
+      matching_query = matching_query,
+      dir_matching_db = db_path
     )
   )
 })
@@ -256,16 +254,14 @@ test_that("set_matching_environment handles bootstrap directory with no bootstra
   })
 
   # Should not error when no bootstrap files exist
-  suppressMessages(
-    suppressWarnings(
-      set_matching_environment(
-        eligible_pop = eligible_pop,
-        matching_query = matching_query,
-        with_bootstrap = TRUE,
-        n_bootstraps = 10L,
-        dir_bootstrap = bootstrap_dir,
-        dir_matching_db = db_path
-      )
+  expect_silent(
+    set_matching_environment(
+      eligible_pop = eligible_pop,
+      matching_query = matching_query,
+      with_bootstrap = TRUE,
+      n_bootstraps = 10L,
+      dir_bootstrap = bootstrap_dir,
+      dir_matching_db = db_path
     )
   )
 })
@@ -333,13 +329,11 @@ test_that("set_matching_environment returns NULL invisibly", {
   })
 
   # The function should run without error
-  suppressMessages(
-    suppressWarnings(
-      set_matching_environment(
-        eligible_pop = eligible_pop,
-        matching_query = matching_query,
-        dir_matching_db = db_path
-      )
+  expect_silent(
+    set_matching_environment(
+      eligible_pop = eligible_pop,
+      matching_query = matching_query,
+      dir_matching_db = db_path
     )
   )
 })

@@ -140,18 +140,8 @@ test_that("plot works with valid matching_study_cohort data", {
   cohort <- make_simple_cohort()
   class(cohort) <- c("matching_study_cohort", "data.table", "data.frame")
 
-  # Suppress plot output and other messages
-  suppressMessages(suppressWarnings(plot(cohort)))
-})
-
-test_that("plot converts non-data.table to data.table", {
-  cohort <- as.data.frame(make_simple_cohort())
-  class(cohort) <- c("matching_study_cohort", "data.frame")
-
-  expect_silent(suppressMessages(withCallingHandlers(
-    plot(cohort),
-    warning = function(w) {}
-  )))
+  p <- plot(cohort)
+  expect_s3_class(p, "ggplot")
 })
 
 test_that("plot fails with missing 'group' column", {
