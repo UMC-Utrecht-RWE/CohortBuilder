@@ -48,7 +48,7 @@ test_that("summary works with valid matching_study_cohort data", {
 
   result <- summary(cohort)
 
-  expect_is(result, "list")
+  expect_type(result, "list")
   expect_true("episodes_by_group" %in% names(result))
   expect_true("control_usage_distribution" %in% names(result))
 })
@@ -59,7 +59,7 @@ test_that("summary converts non-data.table to data.table", {
 
   result <- summary(cohort)
 
-  expect_is(result, "list")
+  expect_type(result, "list")
   expect_true("episodes_by_group" %in% names(result))
 })
 
@@ -128,7 +128,7 @@ test_that("summary calculates control usage distribution correctly", {
   result <- summary(cohort)
   control_dist <- result$control_usage_distribution
 
-  expect_is(control_dist, "data.table")
+  expect_s3_class(control_dist, "data.table")
   expect_true("times_used" %in% names(control_dist))
   expect_true("n_controls" %in% names(control_dist))
   expect_true("pct_controls" %in% names(control_dist))
@@ -233,7 +233,7 @@ test_that(".cb_sensible_hist_bins returns integer", {
   dates <- as.Date(c("2020-01-01", "2020-02-01", "2020-03-01"))
   bins <- CohortBuilder:::.cb_sensible_hist_bins(dates)
 
-  expect_is(bins, "integer")
+  expect_type(bins, "integer")
   expect_gt(bins, 0L)
   expect_lte(bins, 60L)
 })
@@ -277,7 +277,7 @@ test_that(".plot_msc_hist_ggplot returns ggplot object if ggplot2 available", {
     n_bins = 10L
   )
 
-  expect_is(plot_obj, "ggplot")
+  expect_s3_class(plot_obj, "ggplot")
 })
 
 test_that(".plot_msc_stacked_ggplot returns ggplot object if ggplot2 available", {
@@ -294,7 +294,7 @@ test_that(".plot_msc_stacked_ggplot returns ggplot object if ggplot2 available",
     by_var = "SV_REGION"
   )
 
-  expect_is(plot_obj, "ggplot")
+  expect_s3_class(plot_obj, "ggplot")
 })
 
 test_that(".log_matching_summary logs without errors", {

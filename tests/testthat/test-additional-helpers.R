@@ -54,7 +54,7 @@ test_that("get_matching_population returns a data.table", {
     save_output = FALSE
   )
 
-  expect_is(result, "data.table")
+  expect_s3_class(result, "data.table")
 })
 
 test_that("get_matching_population includes required columns", {
@@ -206,7 +206,7 @@ test_that("get_matching_population converts data frame inputs to data.table", {
     save_output = FALSE
   )
 
-  expect_is(result, "data.table")
+  expect_s3_class(result, "data.table")
 })
 
 test_that("get_matching_population handles multiple matching variables", {

@@ -47,7 +47,7 @@ test_that("get_matching_variables uses default variables when not specified", {
   result <- get_matching_variables(eligible_pop)
 
   # Result should be character vector
-  expect_is(result, "character")
+  expect_type(result, "character")
   expect_gt(length(result), 0)
 })
 
@@ -138,7 +138,7 @@ test_that("get_profile_table returns a data.table", {
     save_output = FALSE
   )
 
-  expect_is(result, "data.table")
+  expect_s3_class(result, "data.table")
 })
 
 test_that("get_profile_table includes all matching variables", {
@@ -254,7 +254,7 @@ test_that("get_profile_table converts to data.table if needed", {
     save_output = FALSE
   )
 
-  expect_is(result, "data.table")
+  expect_s3_class(result, "data.table")
 })
 
 test_that("get_profile_table saves to parquet when save_output = TRUE", {
