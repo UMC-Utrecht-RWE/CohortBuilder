@@ -7,8 +7,15 @@ library(data.table)
 
 # What variables will we match on?
 matching_vars <- c(
-  "SV_SEX", "SV_REGION", "SV_HIST_COVID_VACC", "SV_PRIOR_COVID_DG", "SV_BRAND_COVID_VACC",
-  "SV_PREG_STATUS", "SV_IMMUNOCOMPROMISED", "CDC_RISK", "SV_SES_STATUS"
+  "SV_SEX",
+  "SV_REGION",
+  "SV_HIST_COVID_VACC",
+  "SV_PRIOR_COVID_DG",
+  "SV_BRAND_COVID_VACC",
+  "SV_PREG_STATUS",
+  "SV_IMMUNOCOMPROMISED",
+  "CDC_RISK",
+  "SV_SES_STATUS"
 )
 
 # What column will hold the id to the persons?
@@ -72,7 +79,10 @@ if (simulate_d3_eligibility) {
     output_file = "D3_ELIGIBILITY"
   )
 } else {
-  D3_ELIGIBILITY <- arrow::read_parquet(file.path(dir_input, "D3_ELIGIBILITY.parquet"))
+  D3_ELIGIBILITY <- arrow::read_parquet(file.path(
+    dir_input,
+    "D3_ELIGIBILITY.parquet"
+  ))
 }
 
 ##########################
@@ -80,10 +90,18 @@ if (simulate_d3_eligibility) {
 ##########################
 
 matching_query <- suppressWarnings(
-  getSQL(system.file("sql_queries", "matching_query_with_replacement.sql", package = "CohortBuilder"))
+  getSQL(system.file(
+    "sql_queries",
+    "matching_query_with_replacement.sql",
+    package = "CohortBuilder"
+  ))
 )
 target_table_query <- getSQL(
-  system.file("sql_queries", "create_matching_target_table.sql", package = "CohortBuilder")
+  system.file(
+    "sql_queries",
+    "create_matching_target_table.sql",
+    package = "CohortBuilder"
+  )
 )
 
 ####################################################
