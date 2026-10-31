@@ -65,7 +65,7 @@ test_that("set_matching_environment works with basic inputs", {
     unlink(db_path)
   })
 
-  expect_silent(
+  expect_no_error(
     set_matching_environment(
       eligible_pop = eligible_pop,
       matching_query = matching_query,
@@ -109,7 +109,7 @@ test_that("set_matching_environment handles non-existent database gracefully", {
   })
 
   # Should not error when database doesn't exist
-  expect_silent(
+  expect_no_error(
     set_matching_environment(
       eligible_pop = eligible_pop,
       matching_query = matching_query,
@@ -254,7 +254,7 @@ test_that("set_matching_environment handles bootstrap directory with no bootstra
   })
 
   # Should not error when no bootstrap files exist
-  expect_silent(
+  expect_no_error(
     set_matching_environment(
       eligible_pop = eligible_pop,
       matching_query = matching_query,
@@ -329,7 +329,7 @@ test_that("set_matching_environment returns NULL invisibly", {
   })
 
   # The function should run without error
-  expect_silent(
+  expect_no_error(
     set_matching_environment(
       eligible_pop = eligible_pop,
       matching_query = matching_query,

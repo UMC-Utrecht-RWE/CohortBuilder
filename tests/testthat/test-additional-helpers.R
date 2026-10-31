@@ -328,7 +328,7 @@ test_that(".ensure_directory uses provided label in logging", {
   })
 
   # Should not error when using custom label
-  expect_silent(
+  expect_no_error(
     CohortBuilder:::.ensure_directory(test_dir, label = "custom_output")
   )
 })

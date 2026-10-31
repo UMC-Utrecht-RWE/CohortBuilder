@@ -2,3 +2,4 @@
 *.parquet
 *.Rproj
 *.gz
+tests/testthat/Rplots.pdf

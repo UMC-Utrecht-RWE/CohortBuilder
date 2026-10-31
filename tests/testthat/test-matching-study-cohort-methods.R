@@ -302,7 +302,7 @@ test_that(".log_matching_summary logs without errors", {
 
   cohort <- make_simple_cohort()
 
-  expect_silent(
+  expect_no_error(
     CohortBuilder:::.log_matching_summary(cohort)
   )
 })
@@ -312,7 +312,7 @@ test_that(".log_matching_summary handles missing required columns", {
 
   cohort <- make_simple_cohort()[, -"group"]
 
-  expect_silent(
+  expect_no_error(
     CohortBuilder:::.log_matching_summary(cohort)
   )
 })
